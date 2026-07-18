@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   AddCropForm,
   ColorMode,
@@ -11,8 +11,15 @@ import type {
   StatusFilter,
 } from './types';
 import { palettes } from './palette';
-import { CROP_OPTIONS, SEED_FIELDS } from './seedData';
-import { emptyField, formatDateLabel, plantedField } from './lib/fieldHelpers';
+import { CROP_OPTIONS } from './seedData';
+import { formatDateLabel } from './lib/fieldHelpers';
+import {
+  addCrop as addCropApi,
+  clearFieldCrop,
+  fetchFields,
+  setFieldCrop,
+  updateField as updateFieldApi,
+} from './lib/api';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import MapPopup from './components/MapPopup';
@@ -37,20 +44,42 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
 
   const [screen, setScreen] = useState<Screen>('dashboard');
-  const [selectedFieldId, setSelectedFieldId] = useState(1);
-  const [fields, setFields] = useState<Field[]>(() => JSON.parse(JSON.stringify(SEED_FIELDS)));
+  const [selectedFieldId, setSelectedFieldId] = useState('');
+  const [fields, setFields] = useState<Field[]>([]);
+  const [fieldsLoading, setFieldsLoading] = useState(true);
+  const [fieldsError, setFieldsError] = useState<string | null>(null);
 
   const [editMode, setEditMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingCrop, setEditingCrop] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | false>(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dashboardView, setDashboardView] = useState<DashboardView>('cards');
-  const [mapPopupFieldId, setMapPopupFieldId] = useState<number | null>(null);
+  const [mapPopupFieldId, setMapPopupFieldId] = useState<string | null>(null);
 
   const [addForm, setAddForm] = useState<AddCropForm>({ cropName: '', photoAdded: false, date: '', plotName: '' });
+  const [addCropSaving, setAddCropSaving] = useState(false);
+  const [addCropError, setAddCropError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFields()
+      .then((data) => {
+        if (cancelled) return;
+        setFields(data);
+        setFieldsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setFieldsError(err instanceof Error ? err.message : 'Failed to load fields.');
+        setFieldsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
@@ -130,7 +159,7 @@ export default function App() {
     setLoginError('');
   }
 
-  function selectField(id: number) {
+  function selectField(id: string) {
     if (editMode) {
       toggleSelect(id);
       return;
@@ -147,59 +176,71 @@ export default function App() {
     setEditingCrop(false);
   }
 
-  function toggleSelect(id: number) {
+  function toggleSelect(id: string) {
     setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
-  function clearSelected() {
+  function applyFieldUpdate(updated: Field) {
+    setFields((fs) => fs.map((f) => (f.id === updated.id ? updated : f)));
+  }
+
+  async function clearSelected() {
     if (!selectedIds.length) return;
-    setFields((fs) => fs.map((f) => (selectedIds.includes(f.id) ? emptyField(f) : f)));
+    const ids = selectedIds;
     setSelectedIds([]);
+    try {
+      const updates = await Promise.all(ids.map((id) => clearFieldCrop(id)));
+      setFields((fs) => fs.map((f) => updates.find((u) => u.id === f.id) ?? f));
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to clear selected fields.');
+    }
   }
 
-  function saveAddCrop() {
-    const { cropName, date, plotName } = addForm;
+  async function saveAddCrop() {
+    const { cropName, date, plotName, photoAdded } = addForm;
     if (!cropName.trim() || !plotName.trim()) return;
-    const dateLabel = date ? formatDateLabel(date) : 'today';
-    setFields((fs) => {
-      const idx = fs.findIndex((f) => f.name.toLowerCase() === plotName.trim().toLowerCase());
-      if (idx >= 0) {
-        const next = [...fs];
-        next[idx] = plantedField(next[idx], cropName.trim(), dateLabel);
-        return next;
-      }
-      const newField: Field = plantedField(
-        {
-          id: Math.max(0, ...fs.map((f) => f.id)) + 1,
-          name: plotName.trim(),
-          acres: '—',
-          crop: cropName.trim(),
-          status: 'safe',
-          risk: 0,
-          reason: '',
-          confidence: 'High',
-          lastScan: '',
-          suggestedCrops: [],
-          durationLabel: '',
-          durationRange: '',
-          history: [],
-        },
-        cropName.trim(),
-        dateLabel,
-      );
-      return [...fs, newField];
-    });
-    setScreen('dashboard');
+    setAddCropSaving(true);
+    setAddCropError(null);
+    try {
+      const updated = await addCropApi({
+        cropName: cropName.trim(),
+        plotName: plotName.trim(),
+        date: date ? formatDateLabel(date) : undefined,
+        photoAdded,
+      });
+      setFields((fs) => {
+        const idx = fs.findIndex((f) => f.id === updated.id);
+        if (idx >= 0) {
+          const next = [...fs];
+          next[idx] = updated;
+          return next;
+        }
+        return [...fs, updated];
+      });
+      setScreen('dashboard');
+    } catch (err) {
+      setAddCropError(err instanceof Error ? err.message : 'Failed to save planting.');
+    } finally {
+      setAddCropSaving(false);
+    }
   }
 
-  function clearCropInDetail() {
-    setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? emptyField(f) : f)));
-    setEditingCrop(false);
+  async function clearCropInDetail() {
+    try {
+      applyFieldUpdate(await clearFieldCrop(selectedFieldId));
+      setEditingCrop(false);
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to clear crop.');
+    }
   }
 
-  function setCrop(cropName: string) {
-    setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? plantedField(f, cropName) : f)));
-    setEditingCrop(false);
+  async function setCrop(cropName: string) {
+    try {
+      applyFieldUpdate(await setFieldCrop(selectedFieldId, cropName));
+      setEditingCrop(false);
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to update crop.');
+    }
   }
 
   function updateFieldName(name: string) {
@@ -208,6 +249,26 @@ export default function App() {
 
   function updateFieldAcres(acres: string) {
     setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? { ...f, acres } : f)));
+  }
+
+  async function commitFieldName() {
+    const current = fields.find((f) => f.id === selectedFieldId);
+    if (!current) return;
+    try {
+      applyFieldUpdate(await updateFieldApi(current.id, { name: current.name }));
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to save field name.');
+    }
+  }
+
+  async function commitFieldAcres() {
+    const current = fields.find((f) => f.id === selectedFieldId);
+    if (!current) return;
+    try {
+      applyFieldUpdate(await updateFieldApi(current.id, { acres: current.acres }));
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to save acreage.');
+    }
   }
 
   return (
@@ -246,7 +307,19 @@ export default function App() {
             <Header palette={palette} eyebrow={header.eyebrow} title={header.title} showBack={showBack} onBack={back} />
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 16px' }}>
-              {screen === 'dashboard' && (
+              {screen === 'dashboard' && fieldsLoading && (
+                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
+                  Loading fields…
+                </div>
+              )}
+
+              {screen === 'dashboard' && !fieldsLoading && fieldsError && (
+                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
+                  Couldn't load fields from the server: {fieldsError}
+                </div>
+              )}
+
+              {screen === 'dashboard' && !fieldsLoading && !fieldsError && (
                 <DashboardScreen
                   palette={palette}
                   fields={visibleFields}
@@ -290,6 +363,8 @@ export default function App() {
                   onDismiss={() => setActionMessage('Recommendation dismissed.')}
                   onUpdateName={updateFieldName}
                   onUpdateAcres={updateFieldAcres}
+                  onCommitName={commitFieldName}
+                  onCommitAcres={commitFieldAcres}
                 />
               )}
 
@@ -329,6 +404,8 @@ export default function App() {
                   palette={palette}
                   form={addForm}
                   plotNames={plotNames}
+                  saving={addCropSaving}
+                  error={addCropError}
                   onChangeCropName={(cropName) => setAddForm((s) => ({ ...s, cropName }))}
                   onChangeDate={(date) => setAddForm((s) => ({ ...s, date }))}
                   onChangePlotName={(plotName) => setAddForm((s) => ({ ...s, plotName }))}

@@ -16,11 +16,11 @@ interface DashboardScreenProps {
   onSetStatusFilter: (filter: StatusFilter) => void;
   editMode: boolean;
   onToggleEditMode: () => void;
-  selectedIds: number[];
-  onToggleSelect: (id: number) => void;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
   onClearSelected: () => void;
-  onSelectField: (id: number) => void;
-  onShowMapPopup: (id: number) => void;
+  onSelectField: (id: string) => void;
+  onShowMapPopup: (id: string) => void;
   onAddCrop: () => void;
 }
 

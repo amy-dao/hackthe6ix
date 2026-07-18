@@ -6,6 +6,8 @@ interface AddCropScreenProps {
   palette: Palette;
   form: AddCropForm;
   plotNames: string[];
+  saving?: boolean;
+  error?: string | null;
   onChangeCropName: (value: string) => void;
   onChangeDate: (value: string) => void;
   onChangePlotName: (value: string) => void;
@@ -18,6 +20,8 @@ export default function AddCropScreen({
   palette,
   form,
   plotNames,
+  saving = false,
+  error = null,
   onChangeCropName,
   onChangeDate,
   onChangePlotName,
@@ -25,7 +29,7 @@ export default function AddCropScreen({
   onSave,
   onCancel,
 }: AddCropScreenProps) {
-  const canSave = form.cropName.trim().length > 0 && form.plotName.trim().length > 0;
+  const canSave = form.cropName.trim().length > 0 && form.plotName.trim().length > 0 && !saving;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -83,6 +87,11 @@ export default function AddCropScreen({
           </datalist>
         </div>
       </div>
+      {error && (
+        <div style={{ fontSize: 12.5, color: palette.rotate.text, background: palette.rotate.bg, borderRadius: 10, padding: '10px 12px' }}>
+          {error}
+        </div>
+      )}
       <div
         onClick={canSave ? onSave : undefined}
         style={{
@@ -97,7 +106,7 @@ export default function AddCropScreen({
           opacity: canSave ? 1 : 0.45,
         }}
       >
-        Save planting
+        {saving ? 'Saving…' : 'Save planting'}
       </div>
       <div onClick={onCancel} style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: palette.muted, cursor: 'pointer' }}>
         Cancel

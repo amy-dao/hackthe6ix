@@ -7,7 +7,7 @@ export interface PlantingRecord {
 }
 
 export interface Field {
-  id: number;
+  id: string;
   name: string;
   crop: string;
   acres: number | string;

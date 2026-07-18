@@ -19,6 +19,8 @@ interface FieldDetailScreenProps {
   onDismiss: () => void;
   onUpdateName: (name: string) => void;
   onUpdateAcres: (acres: string) => void;
+  onCommitName: () => void;
+  onCommitAcres: () => void;
 }
 
 type DetailTab = 'field' | 'crop' | 'history';
@@ -43,6 +45,8 @@ export default function FieldDetailScreen({
   onDismiss,
   onUpdateName,
   onUpdateAcres,
+  onCommitName,
+  onCommitAcres,
 }: FieldDetailScreenProps) {
   const [tab, setTab] = useState<DetailTab>('crop');
   const meta = statusMeta(field.status, palette);
@@ -89,11 +93,21 @@ export default function FieldDetailScreen({
         <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <div style={fieldLabelStyle(palette)}>Field name</div>
-            <input value={field.name} onChange={(e) => onUpdateName(e.target.value)} style={fieldInputStyle(palette)} />
+            <input
+              value={field.name}
+              onChange={(e) => onUpdateName(e.target.value)}
+              onBlur={onCommitName}
+              style={fieldInputStyle(palette)}
+            />
           </div>
           <div>
             <div style={fieldLabelStyle(palette)}>Acres</div>
-            <input value={String(field.acres)} onChange={(e) => onUpdateAcres(e.target.value)} style={fieldInputStyle(palette)} />
+            <input
+              value={String(field.acres)}
+              onChange={(e) => onUpdateAcres(e.target.value)}
+              onBlur={onCommitAcres}
+              style={fieldInputStyle(palette)}
+            />
           </div>
         </div>
       )}

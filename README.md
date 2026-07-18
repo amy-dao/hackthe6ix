@@ -8,9 +8,12 @@ concentrated. Implemented from the "Field Intelligence App" design
 (see `PRD.md`-style goals: a rotation-timing model + camera-based
 identification, unified around a field/season data model).
 
-This is a frontend prototype: all data is seeded/mocked client-side
-(no backend, no real ML/CV model) so the full UI and interaction flow
-can be reviewed and demoed end-to-end.
+This is primarily a frontend prototype: the UI seeds/mocks its own data
+client-side (no real ML/CV model) so the full interaction flow can be
+reviewed and demoed end-to-end. A FastAPI + MongoDB backend now exists
+under `backend/` with a `fields` collection matching the app's data
+model, but the React app does not call it yet — field/crop state still
+lives in React and resets on reload.
 
 ## Features / screens
 
@@ -35,15 +38,23 @@ can be reviewed and demoed end-to-end.
 
 ## Stack
 
-React 19 + TypeScript + Vite, styled with plain inline styles (no CSS
-framework). No backend — state lives in React and resets on reload.
+- **Frontend**: React 19 + TypeScript + Vite, styled with plain inline
+  styles (no CSS framework). Field/crop state currently lives in React
+  and resets on reload — see the caveat above.
+- **Backend**: FastAPI + PyMongo, under `backend/`, backed by a MongoDB
+  Atlas cluster. Not yet wired to the frontend.
 
 ## Prerequisites
 
 - Node.js `20.19+` or `22.12+` (required by Vite 8)
 - npm
+- Python `3.10+`
+- A MongoDB Atlas cluster (or any MongoDB connection string) — only
+  needed if you're running the backend
 
 ## Run it
+
+### Frontend
 
 ```bash
 npm install
@@ -51,6 +62,35 @@ npm run dev
 ```
 
 Then open http://localhost:3000
+
+### Backend
+
+One-time setup:
+
+```bash
+./install.sh
+```
+
+This installs frontend deps, creates a `.venv` virtual environment,
+installs `backend/requirements.txt` into it, and copies
+`backend/.env.example` to `backend/.env` if it doesn't exist yet. Edit
+`backend/.env` and set `MONGODB_URI` to your real Atlas connection
+string (see `backend/.env.example` for the format).
+
+(You can use a differently-named venv instead of `.venv` if you
+prefer — e.g. `python3 -m venv hackthesix && source
+hackthesix/bin/activate && pip install -r backend/requirements.txt`.
+Just make sure it's `.gitignore`d.)
+
+Then, each time you want to run it:
+
+```bash
+source .venv/bin/activate
+uvicorn backend.app:app --reload --port 8000
+```
+
+Interactive API docs are at http://localhost:8000/docs. See
+`backend/app.py` for the available `/fields` endpoints.
 
 ## Other scripts
 
@@ -76,6 +116,13 @@ src/
   screens/
     LoginScreen.tsx, DashboardScreen.tsx, FieldDetailScreen.tsx,
     IdentifyScreen.tsx, AddCropScreen.tsx, ProfileScreen.tsx
+
+backend/
+  app.py                 FastAPI app + /fields routes
+  db.py                   MongoDB connection (reads backend/.env)
+  models.py               Pydantic schemas (Field, PlantingRecord, ...)
+  requirements.txt
+  .env.example            MONGODB_URI template
 ```
 
 ## Other scaffolding in this repo
