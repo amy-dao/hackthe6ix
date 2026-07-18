@@ -18,9 +18,12 @@ can be reviewed and demoed end-to-end.
 - **Fields dashboard** — card grid and birdseye map view of all fields,
   with search, status filters (Rotate now / Marginal / Safe / Empty),
   and a bulk-edit mode to clear crops across multiple fields at once
-- **Field detail** — rotation recommendation, risk score with
+- **Field detail** — three tabs: **Field** (edit the plot's name and
+  acreage), **Crop** (rotation recommendation, risk score with
   plain-language reasoning, confidence + last-scan date, suggested next
-  crops, and accept / override / dismiss actions
+  crops, and accept / override / dismiss actions), and **History**
+  (past plantings for that plot — crop, season, and outcome notes;
+  changing or clearing the current crop automatically logs it here)
 - **Identify** — point a camera at a plant (live preview via
   `getUserMedia`, falls back to a placeholder if no camera permission)
   or describe it in text; returns a mocked weed/crop identification

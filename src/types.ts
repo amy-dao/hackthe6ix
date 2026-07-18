@@ -1,5 +1,11 @@
 export type FieldStatus = 'rotate' | 'marginal' | 'safe' | 'empty';
 
+export interface PlantingRecord {
+  crop: string;
+  period: string;
+  note?: string;
+}
+
 export interface Field {
   id: number;
   name: string;
@@ -13,6 +19,7 @@ export interface Field {
   suggestedCrops: string[];
   durationLabel: string;
   durationRange: string;
+  history: PlantingRecord[];
 }
 
 export type Screen = 'dashboard' | 'detail' | 'camera' | 'profile' | 'addCrop';

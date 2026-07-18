@@ -16,6 +16,11 @@ export const SEED_FIELDS: Field[] = [
     suggestedCrops: ['Soybeans', 'Winter Wheat', 'Alfalfa'],
     durationLabel: 'Decision window',
     durationRange: 'Now — plant within 2 weeks',
+    history: [
+      { crop: 'Corn', period: '2025 season', note: 'Yield down 12% from nitrogen depletion' },
+      { crop: 'Soybeans', period: '2024 season', note: 'Strong yield, low pest pressure' },
+      { crop: 'Corn', period: '2023 season' },
+    ],
   },
   {
     id: 2,
@@ -30,6 +35,10 @@ export const SEED_FIELDS: Field[] = [
     suggestedCrops: [],
     durationLabel: 'Next rotation decision',
     durationRange: 'Sep 15 – Oct 1',
+    history: [
+      { crop: 'Corn', period: '2025 season', note: 'Above-average yield' },
+      { crop: 'Winter Wheat', period: '2024 season' },
+    ],
   },
   {
     id: 3,
@@ -44,6 +53,11 @@ export const SEED_FIELDS: Field[] = [
     suggestedCrops: ['Soybeans', 'Oats'],
     durationLabel: 'Next rotation decision',
     durationRange: 'Aug 20 – Sep 5',
+    history: [
+      { crop: 'Soybeans', period: '2025 season' },
+      { crop: 'Corn', period: '2024 season', note: 'Organic matter began declining' },
+      { crop: 'Corn', period: '2023 season' },
+    ],
   },
   {
     id: 4,
@@ -58,5 +72,9 @@ export const SEED_FIELDS: Field[] = [
     suggestedCrops: [],
     durationLabel: 'Next rotation decision',
     durationRange: 'Jul 30 – Aug 10',
+    history: [
+      { crop: 'Alfalfa', period: '2025 season' },
+      { crop: 'Oats', period: '2024 season' },
+    ],
   },
 ];

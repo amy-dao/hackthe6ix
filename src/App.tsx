@@ -182,6 +182,7 @@ export default function App() {
           suggestedCrops: [],
           durationLabel: '',
           durationRange: '',
+          history: [],
         },
         cropName.trim(),
         dateLabel,
@@ -199,6 +200,14 @@ export default function App() {
   function setCrop(cropName: string) {
     setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? plantedField(f, cropName) : f)));
     setEditingCrop(false);
+  }
+
+  function updateFieldName(name: string) {
+    setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? { ...f, name } : f)));
+  }
+
+  function updateFieldAcres(acres: string) {
+    setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? { ...f, acres } : f)));
   }
 
   return (
@@ -279,6 +288,8 @@ export default function App() {
                   onAccept={() => setActionMessage('Recommendation accepted.')}
                   onOverride={() => setActionMessage('Marked as overridden by farmer.')}
                   onDismiss={() => setActionMessage('Recommendation dismissed.')}
+                  onUpdateName={updateFieldName}
+                  onUpdateAcres={updateFieldAcres}
                 />
               )}
 
