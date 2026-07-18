@@ -2,35 +2,33 @@ import type { Palette } from '../palette';
 import type { CropRotationRecommendation } from '../types';
 import { fieldLabelStyle } from '../lib/formStyles';
 
-interface CropRotationScreenProps {
+interface RecommendationScreenProps {
   palette: Palette;
-  recommendations: CropRotationRecommendation[];
+  recommendation: CropRotationRecommendation | null;
   loading?: boolean;
   error?: string | null;
   onRetry: () => void;
-  onBack: () => void;
 }
 
-export default function CropRotationScreen({
+export default function RecommendationScreen({
   palette,
-  recommendations,
+  recommendation,
   loading = false,
   error = null,
   onRetry,
-  onBack,
-}: CropRotationScreenProps) {
+}: RecommendationScreenProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {loading && (
         <div style={{ textAlign: 'center', padding: '30px 0', fontSize: 13.5, color: palette.muted }}>
-          Finding rotation pairings…
+          Generating rotation recommendation…
         </div>
       )}
 
       {!loading && error && (
         <>
           <div style={{ background: palette.card, borderRadius: 16, padding: 16, fontSize: 13.5, color: palette.dark, lineHeight: 1.5 }}>
-            Couldn't generate rotation recommendations: {error}
+            Couldn't generate a recommendation: {error}
           </div>
           <div onClick={onRetry} style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: palette.accent, cursor: 'pointer' }}>
             Try again
@@ -38,26 +36,24 @@ export default function CropRotationScreen({
         </>
       )}
 
-      {!loading && !error && recommendations.length === 0 && (
+      {!loading && !error && !recommendation && (
         <div style={{ textAlign: 'center', padding: '30px 0', fontSize: 13.5, color: palette.muted }}>
-          No rotation pairings yet.
+          No recommendation yet.
         </div>
       )}
 
-      {!loading && !error && recommendations.length > 0 && (
-        <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {recommendations.map((rec, index) => (
-              <div key={index} style={{ background: palette.card, borderRadius: 16, padding: 16 }}>
-                <div style={fieldLabelStyle(palette)}>Pair {rec.currentCrop} with</div>
-                <div style={{ fontSize: 19, fontWeight: 800, color: palette.dark }}>{rec.recommendedCrop}</div>
-              </div>
-            ))}
+      {!loading && !error && recommendation && (
+        <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <div style={fieldLabelStyle(palette)}>Recommended crop</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: palette.dark }}>{recommendation.recommendedCrop}</div>
           </div>
-          <div onClick={onBack} style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: palette.accent, cursor: 'pointer' }}>
-            Back
+          <div style={{ height: 1, background: 'rgba(15,45,38,0.1)' }} />
+          <div>
+            <div style={fieldLabelStyle(palette)}>Rotate by</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: palette.dark }}>{recommendation.rotationDate}</div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

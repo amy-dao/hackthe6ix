@@ -1,0 +1,226 @@
+import type { Palette } from '../palette';
+import type { AddFieldForm, CropEntryForm } from '../types';
+import { fieldLabelStyle, fieldInputStyle } from '../lib/formStyles';
+import { titleCase } from '../lib/fieldHelpers';
+
+const PH_MIN = 3.5;
+const PH_MAX = 9;
+
+interface AddFieldScreenProps {
+  palette: Palette;
+  form: AddFieldForm;
+  cropOptions: string[];
+  soilTypeOptions: string[];
+  saving?: boolean;
+  error?: string | null;
+  onChangePlotName: (value: string) => void;
+  onChangeAcres: (value: string) => void;
+  onChangeSoilPh: (value: string) => void;
+  onToggleSoilPhUnknown: () => void;
+  onChangeSoilType: (value: string) => void;
+  onAddCropEntry: () => void;
+  onRemoveCropEntry: (index: number) => void;
+  onChangeCropEntryCrop: (index: number, crop: string) => void;
+  onChangeCropEntryMonth: (index: number, month: string) => void;
+  onSetCurrentEntry: (index: number) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function selectStyle(palette: Palette) {
+  return { ...fieldInputStyle(palette), appearance: 'auto' as const, cursor: 'pointer' };
+}
+
+export default function AddFieldScreen({
+  palette,
+  form,
+  cropOptions,
+  soilTypeOptions,
+  saving = false,
+  error = null,
+  onChangePlotName,
+  onChangeAcres,
+  onChangeSoilPh,
+  onToggleSoilPhUnknown,
+  onChangeSoilType,
+  onAddCropEntry,
+  onRemoveCropEntry,
+  onChangeCropEntryCrop,
+  onChangeCropEntryMonth,
+  onSetCurrentEntry,
+  onSave,
+  onCancel,
+}: AddFieldScreenProps) {
+  const cropChoices = cropOptions.map(titleCase);
+
+  const acresValue = Number(form.acres);
+  const acresValid = form.acres.trim() !== '' && Number.isFinite(acresValue) && acresValue > 0;
+
+  const phValue = Number(form.soilPh);
+  const phValid = form.soilPhUnknown || (form.soilPh.trim() !== '' && Number.isFinite(phValue) && phValue >= PH_MIN && phValue <= PH_MAX);
+
+  const entriesValid = form.cropEntries.every((e) => e.crop.trim() !== '' && e.month.trim() !== '');
+  const currentCount = form.cropEntries.filter((e) => e.isCurrent).length;
+
+  const canSave =
+    !saving &&
+    form.plotName.trim().length > 0 &&
+    form.soilType.trim().length > 0 &&
+    acresValid &&
+    phValid &&
+    entriesValid &&
+    currentCount <= 1;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <div style={fieldLabelStyle(palette)}>Plot name</div>
+          <input
+            value={form.plotName}
+            onChange={(e) => onChangePlotName(e.target.value)}
+            placeholder="e.g. North 40"
+            style={fieldInputStyle(palette)}
+          />
+        </div>
+
+        <div>
+          <div style={fieldLabelStyle(palette)}>Field/plot size (acres)</div>
+          <input
+            type="number"
+            min={0}
+            step="0.1"
+            value={form.acres}
+            onChange={(e) => onChangeAcres(e.target.value)}
+            placeholder="e.g. 42"
+            style={fieldInputStyle(palette)}
+          />
+          {!acresValid && form.acres.trim() !== '' && (
+            <div style={{ fontSize: 11.5, color: palette.rotate.bg, marginTop: 4 }}>Enter a size greater than 0.</div>
+          )}
+        </div>
+
+        <div>
+          <div style={fieldLabelStyle(palette)}>Soil pH</div>
+          <input
+            type="number"
+            min={PH_MIN}
+            max={PH_MAX}
+            step="0.1"
+            value={form.soilPh}
+            disabled={form.soilPhUnknown}
+            onChange={(e) => onChangeSoilPh(e.target.value)}
+            placeholder="e.g. 6.2"
+            style={{ ...fieldInputStyle(palette), opacity: form.soilPhUnknown ? 0.5 : 1 }}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12.5, color: palette.muted, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.soilPhUnknown} onChange={onToggleSoilPhUnknown} />
+            I don't know my soil pH yet
+          </label>
+          {!phValid && (
+            <div style={{ fontSize: 11.5, color: palette.rotate.bg, marginTop: 4 }}>
+              Enter a pH between {PH_MIN} and {PH_MAX}, or check "don't know yet".
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div style={fieldLabelStyle(palette)}>Soil type</div>
+          <select value={form.soilType} onChange={(e) => onChangeSoilType(e.target.value)} style={selectStyle(palette)}>
+            <option value="">Select soil type…</option>
+            {soilTypeOptions.map((t) => (
+              <option key={t} value={t}>
+                {titleCase(t)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <div style={fieldLabelStyle(palette)}>Crops on this field</div>
+          <div style={{ fontSize: 12, color: palette.muted, lineHeight: 1.4 }}>
+            Add what's currently growing here (if anything) and any earlier crops you know about. A rotation
+            recommendation needs both a current crop and at least one earlier one.
+          </div>
+        </div>
+
+        {form.cropEntries.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: palette.muted, fontStyle: 'italic' }}>No crops added yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {form.cropEntries.map((entry: CropEntryForm, i: number) => (
+              <div key={i} style={{ background: palette.bg, borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <select
+                    value={entry.crop}
+                    onChange={(e) => onChangeCropEntryCrop(i, e.target.value)}
+                    style={{ ...selectStyle(palette), flex: 1, background: palette.card }}
+                  >
+                    <option value="">Select a crop…</option>
+                    {cropChoices.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="month"
+                    value={entry.month}
+                    onChange={(e) => onChangeCropEntryMonth(i, e.target.value)}
+                    style={{ ...fieldInputStyle(palette), background: palette.card, width: 150, flexShrink: 0 }}
+                  />
+                  <div
+                    onClick={() => onRemoveCropEntry(i)}
+                    style={{ fontSize: 18, color: palette.muted, cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+                    aria-label="Remove"
+                  >
+                    ×
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: palette.dark, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={entry.isCurrent} onChange={() => onSetCurrentEntry(i)} />
+                  Still growing here now
+                </label>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {currentCount > 1 && (
+          <div style={{ fontSize: 11.5, color: palette.rotate.bg }}>Only one crop can be marked as currently growing.</div>
+        )}
+
+        <div onClick={onAddCropEntry} style={{ fontSize: 12.5, fontWeight: 600, color: palette.accent, cursor: 'pointer' }}>
+          + Add a crop
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ fontSize: 12.5, color: palette.rotate.text, background: palette.rotate.bg, borderRadius: 10, padding: '10px 12px' }}>
+          {error}
+        </div>
+      )}
+      <div
+        onClick={canSave ? onSave : undefined}
+        style={{
+          textAlign: 'center',
+          padding: '14px 0',
+          borderRadius: 12,
+          background: palette.dark,
+          color: palette.offwhite,
+          fontWeight: 700,
+          fontSize: 14,
+          cursor: 'pointer',
+          opacity: canSave ? 1 : 0.45,
+        }}
+      >
+        {saving ? 'Saving…' : 'Save field'}
+      </div>
+      <div onClick={onCancel} style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: palette.muted, cursor: 'pointer' }}>
+        Cancel
+      </div>
+    </div>
+  );
+}

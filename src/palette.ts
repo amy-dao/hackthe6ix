@@ -16,6 +16,7 @@ export interface Palette {
   marginal: StatusColor;
   safe: StatusColor;
   empty: StatusColor;
+  unknown: StatusColor;
 }
 
 export const palettes: Record<ColorMode, Palette> = {
@@ -30,6 +31,7 @@ export const palettes: Record<ColorMode, Palette> = {
     marginal: { bg: '#E0A030', text: '#2A2410' },
     safe: { bg: '#3E7B4F', text: '#FFFFFF' },
     empty: { bg: '#C9C6BC', text: '#2A2410' },
+    unknown: { bg: '#5FA8D3', text: '#FFFFFF' },
   },
   'earth-tone': {
     bg: '#F5F3EC',
@@ -42,6 +44,7 @@ export const palettes: Record<ColorMode, Palette> = {
     marginal: { bg: '#B8935A', text: '#2A2410' },
     safe: { bg: '#4F6B4A', text: '#FFFFFF' },
     empty: { bg: '#C9C6BC', text: '#2A2410' },
+    unknown: { bg: '#5FA8D3', text: '#FFFFFF' },
   },
 };
 
@@ -50,8 +53,15 @@ export const statusLabels: Record<FieldStatus, string> = {
   marginal: 'Marginal',
   safe: 'Safe to repeat',
   empty: 'No crop planted',
+  unknown: 'Needs history',
 };
 
 export function statusColorsFor(palette: Palette): Record<FieldStatus, StatusColor> {
-  return { rotate: palette.rotate, marginal: palette.marginal, safe: palette.safe, empty: palette.empty };
+  return {
+    rotate: palette.rotate,
+    marginal: palette.marginal,
+    safe: palette.safe,
+    empty: palette.empty,
+    unknown: palette.unknown,
+  };
 }

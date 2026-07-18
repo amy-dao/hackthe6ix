@@ -1,4 +1,6 @@
-export type FieldStatus = 'rotate' | 'marginal' | 'safe' | 'empty';
+/** 'unknown' = a crop is currently planted but the field has no earlier
+ * planting on record, so there isn't enough history for a recommendation. */
+export type FieldStatus = 'rotate' | 'marginal' | 'safe' | 'empty' | 'unknown';
 
 export interface PlantingRecord {
   crop: string;
@@ -20,9 +22,19 @@ export interface Field {
   durationLabel: string;
   durationRange: string;
   history: PlantingRecord[];
+  soilPh: number | null;
+  soilType: string | null;
 }
 
-export type Screen = 'dashboard' | 'detail' | 'camera' | 'history' | 'profile' | 'addCrop' | 'farmMap' | 'intro';
+export type Screen =
+  | 'dashboard'
+  | 'detail'
+  | 'camera'
+  | 'recommendation'
+  | 'profile'
+  | 'addField'
+  | 'farmMap'
+  | 'intro';
 
 export type DashboardView = 'cards' | 'map';
 
@@ -76,16 +88,29 @@ export interface Profile {
   units: 'acres' | 'hectares';
 }
 
-export interface AddCropForm {
-  cropName: string;
-  photoAdded: boolean;
-  date: string;
+export interface CropEntryForm {
+  crop: string;
+  month: string; // "YYYY-MM"
+  isCurrent: boolean;
+}
+
+export interface AddFieldForm {
   plotName: string;
+  acres: string;
+  soilPh: string;
+  soilPhUnknown: boolean;
+  soilType: string;
+  cropEntries: CropEntryForm[];
 }
 
 export interface LoginForm {
   name: string;
   password: string;
+}
+
+export interface CropRotationRecommendation {
+  recommendedCrop: string;
+  rotationDate: string;
 }
 
 export interface HistoryTrackingForm {
@@ -95,9 +120,4 @@ export interface HistoryTrackingForm {
   yieldAmount: string;
   fertilizerUsed: string;
   pesticidesApplied: string;
-}
-
-export interface CropRotationRecommendation {
-  currentCrop: string;
-  recommendedCrop: string;
 }

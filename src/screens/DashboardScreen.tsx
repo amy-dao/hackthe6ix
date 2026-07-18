@@ -21,7 +21,7 @@ interface DashboardScreenProps {
   onClearSelected: () => void;
   onSelectField: (id: string) => void;
   onShowMapPopup: (id: string) => void;
-  onAddCrop: () => void;
+  onAddField: () => void;
   onOpenFarmMap: () => void;
   farm: FarmState;
 }
@@ -31,6 +31,7 @@ const FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'rotate', label: 'Rotate now' },
   { id: 'marginal', label: 'Marginal' },
   { id: 'safe', label: 'Safe' },
+  { id: 'unknown', label: 'Needs history' },
   { id: 'empty', label: 'Empty' },
 ];
 
@@ -51,11 +52,11 @@ export default function DashboardScreen({
   onClearSelected,
   onSelectField,
   onShowMapPopup,
-  onAddCrop,
+  onAddField,
   onOpenFarmMap,
   farm,
 }: DashboardScreenProps) {
-  const mapLegend = (['rotate', 'marginal', 'safe', 'empty'] as const).map((s) => ({
+  const mapLegend = (['rotate', 'marginal', 'safe', 'unknown', 'empty'] as const).map((s) => ({
     color: statusMeta(s, palette).bg,
     label: statusMeta(s, palette).label,
   }));
@@ -95,10 +96,10 @@ export default function DashboardScreen({
       </div>
 
       <div
-        onClick={onAddCrop}
+        onClick={onAddField}
         style={{ textAlign: 'center', padding: '13px 0', borderRadius: 12, background: palette.dark, color: palette.offwhite, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
       >
-        + Add crop
+        + Add field
       </div>
 
       <div style={{ display: 'flex', gap: 6, background: palette.card, borderRadius: 12, padding: 4 }}>
@@ -182,7 +183,7 @@ export default function DashboardScreen({
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <div onClick={onToggleEditMode} style={{ fontSize: 13, fontWeight: 700, color: palette.accent, cursor: 'pointer', padding: 2 }}>
-              {editMode ? 'Done' : 'Edit'}
+              {editMode ? 'Done' : 'Select fields'}
             </div>
           </div>
 
@@ -222,7 +223,10 @@ export default function DashboardScreen({
 
           {editMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: palette.card, borderRadius: 14, padding: '12px 14px' }}>
-              <div style={{ flex: 1, fontSize: 12.5, color: palette.muted }}>{selectedIds.length} selected</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12.5, color: palette.muted }}>{selectedIds.length} selected</div>
+                <div style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>Empties the crop — doesn't delete the field</div>
+              </div>
               <div
                 onClick={onClearSelected}
                 style={{
@@ -234,6 +238,7 @@ export default function DashboardScreen({
                   fontWeight: 700,
                   fontSize: 13,
                   cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 Clear crop
