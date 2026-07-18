@@ -16,8 +16,7 @@ backend isn't running yet.
 ### 0. Get the secrets from a teammate
 
 This project shares one MongoDB database and one Gemini API key across
-the whole team — you can't generate your own and have it work, you
-need the real values. Ask a teammate (Amy) for:
+the whole team
 
 - `MONGODB_URI`
 - `GEMINI_API_KEY`
@@ -26,19 +25,33 @@ You'll paste these into a file in step 2.
 
 ### 1. Install everything
 
-From the project root:
+Requires: Node.js `20.19+` or `22.12+`, npm, and Python `3.10+`
+already installed on your machine.
+
+**macOS / Linux** — from the project root:
 
 ```bash
 ./install.sh
 ```
 
-This installs the frontend's npm packages, creates a Python virtual
-environment at `.venv`, installs the backend's Python packages into
-it, and creates `backend/.env` from a template (if it doesn't already
-exist).
+**Windows** — if you're using **WSL** or **Git Bash**, just run
+`./install.sh` above, same as macOS/Linux. Otherwise, in PowerShell or
+Command Prompt, run these one at a time from the project root:
 
-Requires: Node.js `20.19+` or `22.12+`, npm, and Python `3.10+`
-already installed on your machine.
+```powershell
+npm install
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r backend/requirements.txt
+copy backend\.env.example backend\.env
+```
+
+(If PowerShell refuses to run `activate` with an execution-policy
+error, see Troubleshooting below.)
+
+Either way, this installs the frontend's npm packages, creates a
+Python virtual environment at `.venv`, installs the backend's Python
+packages into it, and creates `backend/.env` from a template.
 
 ### 2. Add the secrets
 
@@ -56,14 +69,25 @@ local copy.
 
 **Terminal 1 — backend:**
 
+macOS / Linux / WSL / Git Bash:
+
 ```bash
 source .venv/bin/activate
 uvicorn backend.app:app --reload --port 8000
 ```
 
-Wait for `Application startup complete.` Leave this terminal running.
+Windows (PowerShell or Command Prompt):
 
-**Terminal 2 — frontend:**
+```powershell
+.venv\Scripts\activate
+uvicorn backend.app:app --reload --port 8000
+```
+
+Wait for `Application startup complete.` Leave this terminal running.
+You'll know the venv is active because your prompt gets a `(.venv)`
+prefix.
+
+**Terminal 2 — frontend** (same command, every OS):
 
 ```bash
 npm run dev
@@ -86,10 +110,26 @@ close that other thing, or run the backend on a different port:
 `uvicorn backend.app:app --reload --port 8001` — but then also set
 `VITE_API_URL=http://localhost:8001` when you run `npm run dev`.
 
-**`ModuleNotFoundError` or `command not found: uvicorn`**
+**`ModuleNotFoundError` or `command not found: uvicorn` / `'uvicorn' is not recognized`**
 You forgot to activate the virtual environment first — run
-`source .venv/bin/activate` in that terminal, then try again. You'll
-know it worked if your terminal prompt gets a `(.venv)` prefix.
+`source .venv/bin/activate` (macOS/Linux) or `.venv\Scripts\activate`
+(Windows) in that terminal, then try again. You'll know it worked if
+your terminal prompt gets a `(.venv)` prefix.
+
+**Windows: "cannot be loaded because running scripts is disabled on this system"**
+PowerShell is blocking the venv's `activate` script. Run this once in
+that PowerShell window, then retry:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+**Windows: `python` / `python3` not found**
+Windows usually installs Python as `python`, not `python3` — use
+`python -m venv .venv` instead of `python3 -m venv .venv`. If neither
+works, Python isn't installed or isn't on your `PATH` — reinstall from
+[python.org](https://www.python.org/downloads/) and make sure to check
+"Add python.exe to PATH" during setup.
 
 **Nothing happens / blank page at localhost:3000**
 Make sure `npm run dev` (Terminal 2) is actually still running and
