@@ -3,17 +3,18 @@ import type { Screen } from '../types';
 
 interface BottomNavProps {
   palette: Palette;
-  activeTab: 'dashboard' | 'camera' | 'history' | 'profile';
+  activeTab: 'dashboard' | 'camera' | 'history' | 'profile' | 'farmMap';
   onNavigate: (screen: Screen) => void;
 }
 
 const TABS: {
-  key: 'dashboard' | 'camera' | 'history' | 'profile';
+  key: 'dashboard' | 'farmMap' | 'camera' | 'history' | 'profile';
   label: string;
   screen: Screen;
-  shape: 'square' | 'circle' | 'ring' | 'diamond';
+  shape: 'square' | 'circle' | 'ring' | 'diamond' | 'map';
 }[] = [
   { key: 'dashboard', label: 'Fields', screen: 'dashboard', shape: 'square' },
+  { key: 'farmMap', label: 'Map', screen: 'farmMap', shape: 'map' },
   { key: 'camera', label: 'Identify', screen: 'camera', shape: 'circle' },
   { key: 'history', label: 'History', screen: 'history', shape: 'diamond' },
   { key: 'profile', label: 'Profile', screen: 'profile', shape: 'ring' },
@@ -35,11 +36,12 @@ export default function BottomNav({ palette, activeTab, onNavigate }: BottomNavP
               style={{
                 width: 20,
                 height: 20,
-                borderRadius: tab.shape === 'circle' || tab.shape === 'ring' ? '50%' : tab.shape === 'diamond' ? 4 : 5,
+                borderRadius: tab.shape === 'circle' || tab.shape === 'ring' || tab.shape === 'map' ? '50%' : tab.shape === 'diamond' ? 4 : 5,
                 margin: tab.shape === 'diamond' ? '2px auto 6px' : '0 auto 4px',
                 background: tab.shape === 'ring' ? 'transparent' : color,
-                border: tab.shape === 'ring' ? `2px solid ${color}` : 'none',
+                border: tab.shape === 'ring' ? `2px solid ${color}` : tab.shape === 'map' ? `2px solid ${color}` : 'none',
                 transform: tab.shape === 'diamond' ? 'rotate(45deg)' : 'none',
+                boxSizing: 'border-box',
               }}
             />
             <div style={{ fontSize: 10.5, fontWeight: 700, color }}>{tab.label}</div>

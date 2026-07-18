@@ -10,4 +10,9 @@ export default defineConfig({
   preview: {
     port: 3000,
   },
+  css: {
+    postcss: {
+      plugins: [] // Overrides the automatic config lookup with a clean, empty array
+    }
+  }
 })

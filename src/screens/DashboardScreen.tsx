@@ -1,5 +1,5 @@
 import type { Palette } from '../palette';
-import type { DashboardView, Field, StatusFilter } from '../types';
+import type { DashboardView, FarmState, Field, StatusFilter } from '../types';
 import { statusMeta } from '../lib/fieldHelpers';
 import FieldThumb from '../components/FieldThumb';
 
@@ -22,6 +22,8 @@ interface DashboardScreenProps {
   onSelectField: (id: string) => void;
   onShowMapPopup: (id: string) => void;
   onAddCrop: () => void;
+  onOpenFarmMap: () => void;
+  farm: FarmState;
 }
 
 const FILTERS: { id: StatusFilter; label: string }[] = [
@@ -50,6 +52,8 @@ export default function DashboardScreen({
   onSelectField,
   onShowMapPopup,
   onAddCrop,
+  onOpenFarmMap,
+  farm,
 }: DashboardScreenProps) {
   const mapLegend = (['rotate', 'marginal', 'safe', 'empty'] as const).map((s) => ({
     color: statusMeta(s, palette).bg,
@@ -64,6 +68,30 @@ export default function DashboardScreen({
           <div style={{ fontSize: 26, fontWeight: 700, color: palette.dark }}>{rotateNowCount}</div>
         </div>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: palette.rotate.bg, flexShrink: 0 }} />
+      </div>
+
+      <div
+        onClick={onOpenFarmMap}
+        style={{
+          background: palette.card,
+          borderRadius: 16,
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          cursor: 'pointer',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 12, color: palette.muted }}>Your farm map</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>
+            {farm.farmPolygon
+              ? `${farm.farmAreaAcres.toFixed(1)} ac · ${farm.subplots.length} subplot${farm.subplots.length === 1 ? '' : 's'}`
+              : 'Draw your farm boundary'}
+          </div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: palette.accent }}>Open →</div>
       </div>
 
       <div
@@ -218,7 +246,22 @@ export default function DashboardScreen({
       {view === 'map' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ fontSize: 12.5, color: palette.muted, lineHeight: 1.4 }}>
-            Birdseye view of all fields. Tap a plot for details.
+            Birdseye view of crop fields. Use Farm Map for interactive boundaries.
+          </div>
+          <div
+            onClick={onOpenFarmMap}
+            style={{
+              textAlign: 'center',
+              padding: '12px 0',
+              borderRadius: 12,
+              background: palette.safe.bg,
+              color: palette.safe.text,
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: 'pointer',
+            }}
+          >
+            {farm.farmPolygon ? 'Edit interactive farm map' : 'Draw farm on interactive map'}
           </div>
           <div style={{ background: 'linear-gradient(135deg,#2E4A38,#173026)', borderRadius: 18, padding: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gridAutoRows: 64, gap: 5 }}>

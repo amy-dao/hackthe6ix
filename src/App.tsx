@@ -3,17 +3,23 @@ import type {
   AddCropForm,
   ColorMode,
   DashboardView,
+  DrawMode,
+  FarmState,
   Field,
   HistoryTrackingForm,
   InputMode,
   LoginForm,
+  LngLat,
   Profile,
   Screen,
   StatusFilter,
+  Subplot,
+  SubplotData,
 } from './types';
 import { palettes } from './palette';
 import { CROP_OPTIONS } from './seedData';
 import { formatDateLabel } from './lib/fieldHelpers';
+import { EMPTY_FARM, loadSession, saveSession, clearSession } from './lib/storage';
 import {
   addCrop as addCropApi,
   clearFieldCrop,
@@ -27,6 +33,8 @@ import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import MapPopup from './components/MapPopup';
 import LoginScreen from './screens/LoginScreen';
+import IntroScreen from './screens/IntroScreen';
+import FarmMapScreen from './screens/FarmMapScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
@@ -34,12 +42,13 @@ import AddCropScreen from './screens/AddCropScreen';
 import HistoryTrackingScreen from './screens/HistoryTrackingScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
-const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
+const HEADER_MAP: Record<Exclude<Screen, 'detail' | 'intro'>, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
   history: { eyebrow: 'Field Intelligence', title: 'History Tracking' },
   profile: { eyebrow: 'Field Intelligence', title: 'Profile' },
   addCrop: { eyebrow: 'Field Intelligence', title: 'Add Crop' },
+  farmMap: { eyebrow: 'Field Intelligence', title: 'Farm Map' },
 };
 
 const EMPTY_HISTORY_FORM: HistoryTrackingForm = {
@@ -51,13 +60,29 @@ const EMPTY_HISTORY_FORM: HistoryTrackingForm = {
   pesticidesApplied: '',
 };
 
+function readInitialSession() {
+  return loadSession();
+}
+
 export default function App() {
+  const saved = useMemo(() => readInitialSession(), []);
+
   const [colorMode, setColorMode] = useState<ColorMode>('traffic-light');
-  const [authed, setAuthed] = useState(false);
-  const [loginForm, setLoginForm] = useState<LoginForm>({ email: '', password: '' });
+  const [authed, setAuthed] = useState(Boolean(saved?.userName));
+  const [introSeen, setIntroSeen] = useState(Boolean(saved?.introSeen));
+  const [userName, setUserName] = useState(saved?.userName ?? '');
+  const [loginForm, setLoginForm] = useState<LoginForm>({ name: saved?.userName ?? '', password: '' });
   const [loginError, setLoginError] = useState('');
 
-  const [screen, setScreen] = useState<Screen>('dashboard');
+  const [farm, setFarm] = useState<FarmState>(saved?.farm ?? EMPTY_FARM);
+  const [drawMode, setDrawMode] = useState<DrawMode>('idle');
+  const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
+  const [draftAreaAcres, setDraftAreaAcres] = useState(0);
+  const [drawError, setDrawError] = useState<string | null>(null);
+
+  const [screen, setScreen] = useState<Screen>(
+    saved?.userName ? (saved.introSeen ? (saved.farm.farmPolygon ? 'dashboard' : 'farmMap') : 'intro') : 'dashboard',
+  );
   const [selectedFieldId, setSelectedFieldId] = useState('');
   const [fields, setFields] = useState<Field[]>([]);
   const [fieldsLoading, setFieldsLoading] = useState(true);
@@ -99,6 +124,12 @@ export default function App() {
     };
   }, []);
 
+  // Persist session whenever farm / auth state changes
+  useEffect(() => {
+    if (!authed || !userName) return;
+    saveSession({ userName, introSeen, farm });
+  }, [authed, userName, introSeen, farm]);
+
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
   const [flagged, setFlagged] = useState(false);
@@ -108,10 +139,10 @@ export default function App() {
   const [identifyError, setIdentifyError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Profile>({
-    name: 'Jordan Hale',
+    name: saved?.userName || 'Jordan Hale',
     farmName: 'Hale Family Farm',
     location: 'Cedar County, IA',
-    acres: '183',
+    acres: String(saved?.farm.farmAreaAcres || '183'),
     crops: 'Corn, Soybeans, Wheat',
     equipment: 'handheld',
     units: 'acres',
@@ -134,31 +165,92 @@ export default function App() {
   const plotNames = useMemo(() => [...new Set(fields.map((f) => f.name))], [fields]);
   const cropNames = useMemo(() => [...new Set(fields.map((f) => f.crop).filter(Boolean))], [fields]);
 
-  const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addCrop' ? 'dashboard' : screen) as
-    | 'dashboard'
-    | 'camera'
-    | 'history'
-    | 'profile';
+  const activeTab = (
+    screen === 'detail' || screen === 'addCrop' || screen === 'farmMap'
+      ? screen === 'farmMap'
+        ? 'farmMap'
+        : 'dashboard'
+      : screen
+  ) as 'dashboard' | 'camera' | 'history' | 'profile' | 'farmMap';
+
   const showBack = screen === 'detail' || screen === 'addCrop' || (screen === 'camera' && captured);
   const header =
     screen === 'detail'
       ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} ac`, title: selectedField.name }
-      : HEADER_MAP[screen];
+      : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
 
   function signIn() {
-    if (!loginForm.email.trim() || !loginForm.password.trim()) {
-      setLoginError('Enter your email and password to continue.');
+    if (!loginForm.name.trim() || !loginForm.password.trim()) {
+      setLoginError('Enter your name and password to continue.');
       return;
     }
+    const name = loginForm.name.trim();
+    setUserName(name);
+    setProfile((p) => ({ ...p, name }));
     setAuthed(true);
     setLoginError('');
-    setScreen('dashboard');
+    if (!introSeen) {
+      setScreen('intro');
+    } else {
+      setScreen(farm.farmPolygon ? 'dashboard' : 'farmMap');
+    }
   }
 
   function signOut() {
     setAuthed(false);
-    setLoginForm({ email: '', password: '' });
+    setLoginForm({ name: '', password: '' });
     setLoginError('');
+    setUserName('');
+    setIntroSeen(false);
+    setFarm(EMPTY_FARM);
+    setDrawMode('idle');
+    setSelectedSubplotId(null);
+    clearSession();
+  }
+
+  function finishIntro() {
+    setIntroSeen(true);
+    setScreen('farmMap');
+    if (!farm.farmPolygon) setDrawMode('farm');
+  }
+
+  function handleFarmComplete(coords: LngLat[], acres: number) {
+    setFarm((prev) => ({
+      farmPolygon: coords,
+      farmAreaAcres: acres,
+      // Redrawing the boundary invalidates subplot containment — clear them.
+      subplots: prev.farmPolygon ? [] : prev.subplots,
+    }));
+    setSelectedSubplotId(null);
+    setProfile((p) => ({ ...p, acres: String(acres) }));
+    setDrawMode('idle');
+    setDraftAreaAcres(0);
+  }
+
+  function handleSubplotComplete(subplot: Subplot) {
+    setFarm((f) => ({ ...f, subplots: [...f.subplots, subplot] }));
+    setDrawMode('idle');
+    setDraftAreaAcres(0);
+  }
+
+  function handleUpdateSubplotData(id: string, data: SubplotData) {
+    setFarm((f) => ({
+      ...f,
+      subplots: f.subplots.map((s) => (s.id === id ? { ...s, data } : s)),
+    }));
+  }
+
+  function handleDeleteSubplot(id: string) {
+    setFarm((f) => ({ ...f, subplots: f.subplots.filter((s) => s.id !== id) }));
+    setSelectedSubplotId(null);
+  }
+
+  function handleClearFarm() {
+    setFarm(EMPTY_FARM);
+    setSelectedSubplotId(null);
+    setDrawMode('farm');
+    setDrawError(null);
+    setDraftAreaAcres(0);
   }
 
   function selectField(id: string) {
@@ -233,7 +325,6 @@ export default function App() {
     setHistorySaving(true);
     setHistoryError(null);
     try {
-      // TODO: wire up to a real history API endpoint once available.
       await new Promise((resolve) => setTimeout(resolve, 400));
       setHistoryForm(EMPTY_HISTORY_FORM);
     } catch (err) {
@@ -329,6 +420,8 @@ export default function App() {
     runIdentify({ description: textQuery.trim() });
   }
 
+  const shellMaxWidth = screen === 'farmMap' ? 720 : 480;
+
   return (
     <div
       style={{
@@ -343,7 +436,7 @@ export default function App() {
       <div
         style={{
           width: '100%',
-          maxWidth: 480,
+          maxWidth: shellMaxWidth,
           minHeight: '100dvh',
           background: palette.bg,
           display: 'flex',
@@ -356,15 +449,47 @@ export default function App() {
             palette={palette}
             loginForm={loginForm}
             loginError={loginError}
-            onChangeEmail={(email) => setLoginForm((s) => ({ ...s, email }))}
+            onChangeName={(name) => setLoginForm((s) => ({ ...s, name }))}
             onChangePassword={(password) => setLoginForm((s) => ({ ...s, password }))}
             onSignIn={signIn}
           />
+        ) : screen === 'intro' ? (
+          <IntroScreen palette={palette} userName={userName} onContinue={finishIntro} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%' }}>
             <Header palette={palette} eyebrow={header.eyebrow} title={header.title} showBack={showBack} onBack={back} />
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 16px' }}>
+            <div
+              style={{
+                flex: 1,
+                overflowY: screen === 'farmMap' ? 'hidden' : 'auto',
+                padding: '16px 16px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+              }}
+            >
+              {screen === 'farmMap' && (
+                <FarmMapScreen
+                  palette={palette}
+                  farm={farm}
+                  drawMode={drawMode}
+                  selectedSubplotId={selectedSubplotId}
+                  draftAreaAcres={draftAreaAcres}
+                  drawError={drawError}
+                  onSetDrawMode={setDrawMode}
+                  onFarmComplete={handleFarmComplete}
+                  onSubplotComplete={handleSubplotComplete}
+                  onSelectSubplot={setSelectedSubplotId}
+                  onUpdateSubplotData={handleUpdateSubplotData}
+                  onDeleteSubplot={handleDeleteSubplot}
+                  onClearFarm={handleClearFarm}
+                  onDraftAreaChange={setDraftAreaAcres}
+                  onDrawError={setDrawError}
+                  onDone={() => setScreen('dashboard')}
+                />
+              )}
+
               {screen === 'dashboard' && fieldsLoading && (
                 <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
                   Loading fields…
@@ -403,10 +528,12 @@ export default function App() {
                     setAddForm({ cropName: '', photoAdded: false, date: '', plotName: '' });
                     setScreen('addCrop');
                   }}
+                  onOpenFarmMap={() => setScreen('farmMap')}
+                  farm={farm}
                 />
               )}
 
-              {screen === 'detail' && (
+              {screen === 'detail' && selectedField && (
                 <FieldDetailScreen
                   palette={palette}
                   field={selectedField}

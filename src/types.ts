@@ -22,7 +22,7 @@ export interface Field {
   history: PlantingRecord[];
 }
 
-export type Screen = 'dashboard' | 'detail' | 'camera' | 'history' | 'profile' | 'addCrop';
+export type Screen = 'dashboard' | 'detail' | 'camera' | 'history' | 'profile' | 'addCrop' | 'farmMap' | 'intro';
 
 export type DashboardView = 'cards' | 'map';
 
@@ -31,6 +31,40 @@ export type InputMode = 'photo' | 'text';
 export type ColorMode = 'traffic-light' | 'earth-tone';
 
 export type StatusFilter = 'all' | FieldStatus;
+
+export type DrawMode = 'idle' | 'farm' | 'subplot' | 'edit';
+
+export type SoilTexture = 'sandy' | 'sandy-loam' | 'loam' | 'silt-loam' | 'clay-loam' | 'clay' | 'silty-clay';
+
+/** GeoJSON-style [longitude, latitude] */
+export type LngLat = [number, number];
+
+export interface SubplotData {
+  soilPh: number | '';
+  soilTexture: SoilTexture | '';
+  previousCrops: string;
+  name: string;
+}
+
+export interface Subplot {
+  id: string;
+  coordinates: LngLat[];
+  areaAcres: number;
+  color: string;
+  data: SubplotData;
+}
+
+export interface FarmState {
+  farmPolygon: LngLat[] | null;
+  farmAreaAcres: number;
+  subplots: Subplot[];
+}
+
+export interface PersistedSession {
+  userName: string;
+  introSeen: boolean;
+  farm: FarmState;
+}
 
 export interface Profile {
   name: string;
@@ -50,7 +84,7 @@ export interface AddCropForm {
 }
 
 export interface LoginForm {
-  email: string;
+  name: string;
   password: string;
 }
 
