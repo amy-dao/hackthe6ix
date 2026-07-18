@@ -33,3 +33,14 @@ export function setFieldCrop(id: string, cropName: string): Promise<Field> {
 export function clearFieldCrop(id: string): Promise<Field> {
   return request<Field>(`/fields/${id}/crop`, { method: 'DELETE' });
 }
+
+export interface IdentifyResult {
+  species: string;
+  isWeed: boolean;
+  reason: string;
+  confidence: string;
+}
+
+export function identify(payload: { imageBase64?: string; description?: string }): Promise<IdentifyResult> {
+  return request<IdentifyResult>('/identify', { method: 'POST', body: JSON.stringify(payload) });
+}

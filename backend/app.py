@@ -6,8 +6,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import fields_collection
+from .gemini import identify_plant
 from .logic import empty_field_set, new_planted_field_doc, planted_field_set
-from .models import AddCropRequest, AddFieldRequest, FieldOut, SetCropRequest, UpdateFieldRequest
+from .models import (
+    AddCropRequest,
+    AddFieldRequest,
+    FieldOut,
+    IdentifyRequest,
+    IdentifyResult,
+    SetCropRequest,
+    UpdateFieldRequest,
+)
 
 app = FastAPI(title="Field Intelligence API")
 
@@ -111,3 +120,13 @@ def clear_crop(field_id: str):
     updates = empty_field_set(existing)
     fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
     return serialize_field(fields_collection.find_one({"_id": existing["_id"]}))
+
+
+@app.post("/identify", response_model=IdentifyResult)
+def identify(payload: IdentifyRequest):
+    if not payload.imageBase64 and not payload.description:
+        raise HTTPException(status_code=400, detail="Provide an image or a description.")
+    try:
+        return identify_plant(image_base64=payload.imageBase64, description=payload.description)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Identification failed: {exc}") from exc

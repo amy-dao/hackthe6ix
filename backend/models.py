@@ -46,3 +46,15 @@ class SetCropRequest(BaseModel):
 class UpdateFieldRequest(BaseModel):
     name: Optional[str] = None
     acres: Optional[Union[float, str]] = None
+
+
+class IdentifyRequest(BaseModel):
+    imageBase64: Optional[str] = None
+    description: Optional[str] = None
+
+
+class IdentifyResult(BaseModel):
+    species: str
+    isWeed: bool
+    reason: str
+    confidence: str

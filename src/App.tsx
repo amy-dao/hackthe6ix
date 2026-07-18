@@ -17,6 +17,8 @@ import {
   addCrop as addCropApi,
   clearFieldCrop,
   fetchFields,
+  identify as identifyApi,
+  type IdentifyResult as ApiIdentifyResult,
   setFieldCrop,
   updateField as updateFieldApi,
 } from './lib/api';
@@ -85,6 +87,9 @@ export default function App() {
   const [captured, setCaptured] = useState(false);
   const [flagged, setFlagged] = useState(false);
   const [textQuery, setTextQuery] = useState('');
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [identifying, setIdentifying] = useState(false);
+  const [identifyError, setIdentifyError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Profile>({
     name: 'Jordan Hale',
@@ -111,27 +116,6 @@ export default function App() {
   const selectedField = fields.find((f) => f.id === selectedFieldId) ?? fields[0];
   const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
   const plotNames = useMemo(() => [...new Set(fields.map((f) => f.name))], [fields]);
-
-  const isPhotoMode = inputMode === 'photo';
-  const scanResult: ScanResult = isPhotoMode
-    ? {
-        species: 'Common Ragweed',
-        isWeed: true,
-        tagLabel: 'Weed',
-        tagBg: palette.rotate.bg,
-        tagText: palette.rotate.text,
-        reason: 'Leaf shape and venation pattern match ragweed, not the planted corn crop.',
-        confidence: '94%',
-      }
-    : {
-        species: 'Common Ragweed',
-        isWeed: true,
-        tagLabel: 'Weed',
-        tagBg: palette.rotate.bg,
-        tagText: palette.rotate.text,
-        reason: `Your description ("${textQuery.slice(0, 60)}") matches ragweed's typical stem and leaf pattern.`,
-        confidence: '81%',
-      };
 
   const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addCrop' ? 'dashboard' : screen) as
     | 'dashboard'
@@ -271,6 +255,41 @@ export default function App() {
     }
   }
 
+  function buildScanResult(result: ApiIdentifyResult): ScanResult {
+    return {
+      species: result.species,
+      isWeed: result.isWeed,
+      tagLabel: result.isWeed ? 'Weed' : 'Crop',
+      tagBg: result.isWeed ? palette.rotate.bg : palette.safe.bg,
+      tagText: result.isWeed ? palette.rotate.text : palette.safe.text,
+      reason: result.reason,
+      confidence: result.confidence,
+    };
+  }
+
+  async function runIdentify(payload: { imageBase64?: string; description?: string }) {
+    setCaptured(true);
+    setIdentifying(true);
+    setIdentifyError(null);
+    setScanResult(null);
+    try {
+      setScanResult(buildScanResult(await identifyApi(payload)));
+    } catch (err) {
+      setIdentifyError(err instanceof Error ? err.message : 'Failed to identify.');
+    } finally {
+      setIdentifying(false);
+    }
+  }
+
+  function handleCapture(imageBase64: string) {
+    runIdentify({ imageBase64 });
+  }
+
+  function handleSubmitText() {
+    if (!textQuery.trim()) return;
+    runIdentify({ description: textQuery.trim() });
+  }
+
   return (
     <div
       style={{
@@ -382,18 +401,20 @@ export default function App() {
                     setCaptured(false);
                   }}
                   captured={captured}
-                  onCapture={() => setCaptured(true)}
+                  onCapture={handleCapture}
                   onRetake={() => {
                     setCaptured(false);
                     setFlagged(false);
                     setTextQuery('');
+                    setScanResult(null);
+                    setIdentifyError(null);
                   }}
                   textQuery={textQuery}
                   onChangeTextQuery={setTextQuery}
-                  onSubmitText={() => {
-                    if (textQuery.trim()) setCaptured(true);
-                  }}
+                  onSubmitText={handleSubmitText}
                   scanResult={scanResult}
+                  identifying={identifying}
+                  identifyError={identifyError}
                   flagged={flagged}
                   onToggleFlag={() => setFlagged((v) => !v)}
                 />

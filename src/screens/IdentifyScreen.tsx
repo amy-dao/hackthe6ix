@@ -19,12 +19,14 @@ interface IdentifyScreenProps {
   onSetPhotoMode: () => void;
   onSetTextMode: () => void;
   captured: boolean;
-  onCapture: () => void;
+  onCapture: (imageBase64: string) => void;
   onRetake: () => void;
   textQuery: string;
   onChangeTextQuery: (value: string) => void;
   onSubmitText: () => void;
-  scanResult: ScanResult;
+  scanResult: ScanResult | null;
+  identifying: boolean;
+  identifyError: string | null;
   flagged: boolean;
   onToggleFlag: () => void;
 }
@@ -41,12 +43,36 @@ export default function IdentifyScreen({
   onChangeTextQuery,
   onSubmitText,
   scanResult,
+  identifying,
+  identifyError,
   flagged,
   onToggleFlag,
 }: IdentifyScreenProps) {
   const isPhotoMode = inputMode === 'photo';
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [streamError, setStreamError] = useState(false);
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    onCapture(canvas.toDataURL('image/jpeg', 0.85));
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') onCapture(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
 
   useEffect(() => {
     if (!isPhotoMode || captured) return;
@@ -145,11 +171,27 @@ export default function IdentifyScreen({
           </div>
 
           {!captured && (
-            <div
-              onClick={onCapture}
-              data-testid="capture-button"
-              style={{ alignSelf: 'center', width: 72, height: 72, borderRadius: '50%', background: palette.offwhite, border: `5px solid ${palette.dark}`, cursor: 'pointer' }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div
+                onClick={capturePhoto}
+                data-testid="capture-button"
+                style={{ width: 72, height: 72, borderRadius: '50%', background: palette.offwhite, border: `5px solid ${palette.dark}`, cursor: 'pointer' }}
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="upload-button"
+                style={{ fontSize: 13, fontWeight: 600, color: palette.accent, cursor: 'pointer' }}
+              >
+                Upload photo instead
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
+            </div>
           )}
         </>
       )}
@@ -184,7 +226,24 @@ export default function IdentifyScreen({
         </div>
       )}
 
-      {captured && (
+      {captured && identifying && (
+        <div style={{ textAlign: 'center', padding: '30px 0', fontSize: 13.5, color: palette.muted }}>
+          Identifying…
+        </div>
+      )}
+
+      {captured && !identifying && identifyError && (
+        <>
+          <div style={{ background: palette.card, borderRadius: 16, padding: 16, fontSize: 13.5, color: palette.dark, lineHeight: 1.5 }}>
+            Couldn't identify that: {identifyError}
+          </div>
+          <div onClick={onRetake} style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: palette.accent, cursor: 'pointer' }}>
+            {isPhotoMode ? 'Retake photo' : 'Try another description'}
+          </div>
+        </>
+      )}
+
+      {captured && !identifying && !identifyError && scanResult && (
         <>
           <div style={{ background: palette.card, borderRadius: 16, padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
