@@ -74,3 +74,15 @@ src/
     LoginScreen.tsx, DashboardScreen.tsx, FieldDetailScreen.tsx,
     IdentifyScreen.tsx, AddCropScreen.tsx, ProfileScreen.tsx
 ```
+
+## Other scaffolding in this repo
+
+`main.py`, `requirements*.txt`, and `tests/test_main.py` are an
+early Python scaffold (unrelated to the app above — pending sync with
+its author). Run it with:
+
+```bash
+python main.py
+python main.py Karen
+python -m unittest discover -s tests
+```
