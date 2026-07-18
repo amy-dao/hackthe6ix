@@ -1,4 +1,6 @@
-export type FieldStatus = 'rotate' | 'marginal' | 'safe' | 'empty';
+/** 'unknown' = a crop is currently planted but the field has no earlier
+ * planting on record, so there isn't enough history for a recommendation. */
+export type FieldStatus = 'rotate' | 'marginal' | 'safe' | 'empty' | 'unknown';
 
 export interface PlantingRecord {
   crop: string;
@@ -20,9 +22,11 @@ export interface Field {
   durationLabel: string;
   durationRange: string;
   history: PlantingRecord[];
+  soilPh: number | null;
+  soilType: string | null;
 }
 
-export type Screen = 'dashboard' | 'detail' | 'camera' | 'profile' | 'addCrop';
+export type Screen = 'dashboard' | 'detail' | 'camera' | 'profile' | 'addField';
 
 export type DashboardView = 'cards' | 'map';
 
@@ -42,11 +46,19 @@ export interface Profile {
   units: 'acres' | 'hectares';
 }
 
-export interface AddCropForm {
-  cropName: string;
-  photoAdded: boolean;
-  date: string;
+export interface CropEntryForm {
+  crop: string;
+  month: string; // "YYYY-MM"
+  isCurrent: boolean;
+}
+
+export interface AddFieldForm {
   plotName: string;
+  acres: string;
+  soilPh: string;
+  soilPhUnknown: boolean;
+  soilType: string;
+  cropEntries: CropEntryForm[];
 }
 
 export interface LoginForm {

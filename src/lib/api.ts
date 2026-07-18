@@ -1,4 +1,4 @@
-import type { Field } from '../types';
+import type { CropEntryForm, Field } from '../types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
 
@@ -11,6 +11,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const body = await res.text().catch(() => '');
     throw new Error(`Request to ${path} failed (${res.status})${body ? `: ${body}` : ''}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -18,11 +19,29 @@ export function fetchFields(): Promise<Field[]> {
   return request<Field[]>('/fields');
 }
 
-export function addCrop(payload: { cropName: string; plotName: string; date?: string; photoAdded?: boolean }): Promise<Field> {
-  return request<Field>('/fields/crop', { method: 'POST', body: JSON.stringify(payload) });
+export interface ReferenceData {
+  soilTypes: string[];
+  crops: string[];
 }
 
-export function updateField(id: string, payload: { name?: string; acres?: number | string }): Promise<Field> {
+export function fetchReference(): Promise<ReferenceData> {
+  return request<ReferenceData>('/reference');
+}
+
+export function addField(payload: {
+  name: string;
+  acres?: number | string;
+  soilPh?: number;
+  soilType?: string;
+  cropEntries: CropEntryForm[];
+}): Promise<Field> {
+  return request<Field>('/fields', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateField(
+  id: string,
+  payload: { name?: string; acres?: number | string; soilPh?: number; soilType?: string },
+): Promise<Field> {
   return request<Field>(`/fields/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
 
@@ -32,6 +51,10 @@ export function setFieldCrop(id: string, cropName: string): Promise<Field> {
 
 export function clearFieldCrop(id: string): Promise<Field> {
   return request<Field>(`/fields/${id}/crop`, { method: 'DELETE' });
+}
+
+export function deleteField(id: string): Promise<void> {
+  return request<void>(`/fields/${id}`, { method: 'DELETE' });
 }
 
 export interface IdentifyResult {

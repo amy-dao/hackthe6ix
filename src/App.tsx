@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type {
-  AddCropForm,
+  AddFieldForm,
   ColorMode,
   DashboardView,
   Field,
@@ -11,12 +11,12 @@ import type {
   StatusFilter,
 } from './types';
 import { palettes } from './palette';
-import { CROP_OPTIONS } from './seedData';
-import { formatDateLabel } from './lib/fieldHelpers';
 import {
-  addCrop as addCropApi,
+  addField as addFieldApi,
   clearFieldCrop,
+  deleteField as deleteFieldApi,
   fetchFields,
+  fetchReference,
   identify as identifyApi,
   type IdentifyResult as ApiIdentifyResult,
   setFieldCrop,
@@ -29,14 +29,26 @@ import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
-import AddCropScreen from './screens/AddCropScreen';
+import AddFieldScreen from './screens/AddFieldScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
   profile: { eyebrow: 'Field Intelligence', title: 'Profile' },
-  addCrop: { eyebrow: 'Field Intelligence', title: 'Add Crop' },
+  addField: { eyebrow: 'Field Intelligence', title: 'Add Field' },
+};
+
+const PH_MIN = 3.5;
+const PH_MAX = 9;
+
+const EMPTY_ADD_FIELD_FORM: AddFieldForm = {
+  plotName: '',
+  acres: '',
+  soilPh: '',
+  soilPhUnknown: false,
+  soilType: '',
+  cropEntries: [],
 };
 
 export default function App() {
@@ -61,9 +73,12 @@ export default function App() {
   const [dashboardView, setDashboardView] = useState<DashboardView>('cards');
   const [mapPopupFieldId, setMapPopupFieldId] = useState<string | null>(null);
 
-  const [addForm, setAddForm] = useState<AddCropForm>({ cropName: '', photoAdded: false, date: '', plotName: '' });
-  const [addCropSaving, setAddCropSaving] = useState(false);
-  const [addCropError, setAddCropError] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState<AddFieldForm>(EMPTY_ADD_FIELD_FORM);
+  const [addFieldSaving, setAddFieldSaving] = useState(false);
+  const [addFieldError, setAddFieldError] = useState<string | null>(null);
+
+  const [referenceCrops, setReferenceCrops] = useState<string[]>([]);
+  const [referenceSoilTypes, setReferenceSoilTypes] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +92,22 @@ export default function App() {
         if (cancelled) return;
         setFieldsError(err instanceof Error ? err.message : 'Failed to load fields.');
         setFieldsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchReference()
+      .then((data) => {
+        if (cancelled) return;
+        setReferenceCrops(data.crops);
+        setReferenceSoilTypes(data.soilTypes);
+      })
+      .catch(() => {
+        /* dropdowns render empty; Save stays disabled until a crop/soil type is picked */
       });
     return () => {
       cancelled = true;
@@ -115,13 +146,12 @@ export default function App() {
   const rotateNowCount = fields.filter((f) => f.status === 'rotate').length;
   const selectedField = fields.find((f) => f.id === selectedFieldId) ?? fields[0];
   const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
-  const plotNames = useMemo(() => [...new Set(fields.map((f) => f.name))], [fields]);
 
-  const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addCrop' ? 'dashboard' : screen) as
+  const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addField' ? 'dashboard' : screen) as
     | 'dashboard'
     | 'camera'
     | 'profile';
-  const showBack = screen === 'detail' || screen === 'addCrop' || (screen === 'camera' && captured);
+  const showBack = screen === 'detail' || screen === 'addField' || (screen === 'camera' && captured);
   const header =
     screen === 'detail'
       ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} ac`, title: selectedField.name }
@@ -180,32 +210,67 @@ export default function App() {
     }
   }
 
-  async function saveAddCrop() {
-    const { cropName, date, plotName, photoAdded } = addForm;
-    if (!cropName.trim() || !plotName.trim()) return;
-    setAddCropSaving(true);
-    setAddCropError(null);
+  function onAddCropEntry() {
+    setAddForm((s) => ({ ...s, cropEntries: [...s.cropEntries, { crop: '', month: '', isCurrent: false }] }));
+  }
+
+  function onRemoveCropEntry(index: number) {
+    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.filter((_, i) => i !== index) }));
+  }
+
+  function onChangeCropEntryCrop(index: number, crop: string) {
+    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, crop } : e)) }));
+  }
+
+  function onChangeCropEntryMonth(index: number, month: string) {
+    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, month } : e)) }));
+  }
+
+  function onSetCurrentEntry(index: number) {
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: s.cropEntries.map((e, i) => ({ ...e, isCurrent: i === index ? !e.isCurrent : false })),
+    }));
+  }
+
+  async function saveAddField() {
+    const { plotName, acres, soilPh, soilPhUnknown, soilType, cropEntries } = addForm;
+    const acresNum = Number(acres);
+    const phNum = Number(soilPh);
+    const acresValid = acres.trim() !== '' && Number.isFinite(acresNum) && acresNum > 0;
+    const phValid = soilPhUnknown || (soilPh.trim() !== '' && Number.isFinite(phNum) && phNum >= PH_MIN && phNum <= PH_MAX);
+    const entriesValid = cropEntries.every((e) => e.crop.trim() !== '' && e.month.trim() !== '');
+    const currentCount = cropEntries.filter((e) => e.isCurrent).length;
+    if (!plotName.trim() || !soilType.trim() || !acresValid || !phValid || !entriesValid || currentCount > 1) return;
+
+    setAddFieldSaving(true);
+    setAddFieldError(null);
     try {
-      const updated = await addCropApi({
-        cropName: cropName.trim(),
-        plotName: plotName.trim(),
-        date: date ? formatDateLabel(date) : undefined,
-        photoAdded,
+      const created = await addFieldApi({
+        name: plotName.trim(),
+        acres: acresNum,
+        soilPh: soilPhUnknown ? undefined : phNum,
+        soilType,
+        cropEntries,
       });
-      setFields((fs) => {
-        const idx = fs.findIndex((f) => f.id === updated.id);
-        if (idx >= 0) {
-          const next = [...fs];
-          next[idx] = updated;
-          return next;
-        }
-        return [...fs, updated];
-      });
+      setFields((fs) => [...fs, created]);
       setScreen('dashboard');
     } catch (err) {
-      setAddCropError(err instanceof Error ? err.message : 'Failed to save planting.');
+      setAddFieldError(err instanceof Error ? err.message : 'Failed to save field.');
     } finally {
-      setAddCropSaving(false);
+      setAddFieldSaving(false);
+    }
+  }
+
+  async function deleteSelectedField() {
+    const id = selectedFieldId;
+    try {
+      await deleteFieldApi(id);
+      setFields((fs) => fs.filter((f) => f.id !== id));
+      setSelectedIds((ids) => ids.filter((x) => x !== id));
+      back();
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to delete field.');
     }
   }
 
@@ -227,31 +292,11 @@ export default function App() {
     }
   }
 
-  function updateFieldName(name: string) {
-    setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? { ...f, name } : f)));
-  }
-
-  function updateFieldAcres(acres: string) {
-    setFields((fs) => fs.map((f) => (f.id === selectedFieldId ? { ...f, acres } : f)));
-  }
-
-  async function commitFieldName() {
-    const current = fields.find((f) => f.id === selectedFieldId);
-    if (!current) return;
+  async function saveFieldEdits(updates: { name: string; acres: number; soilPh?: number; soilType: string }) {
     try {
-      applyFieldUpdate(await updateFieldApi(current.id, { name: current.name }));
+      applyFieldUpdate(await updateFieldApi(selectedFieldId, updates));
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to save field name.');
-    }
-  }
-
-  async function commitFieldAcres() {
-    const current = fields.find((f) => f.id === selectedFieldId);
-    if (!current) return;
-    try {
-      applyFieldUpdate(await updateFieldApi(current.id, { acres: current.acres }));
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to save acreage.');
+      setActionMessage(err instanceof Error ? err.message : 'Failed to save field.');
     }
   }
 
@@ -360,17 +405,21 @@ export default function App() {
                   onClearSelected={clearSelected}
                   onSelectField={selectField}
                   onShowMapPopup={setMapPopupFieldId}
-                  onAddCrop={() => {
-                    setAddForm({ cropName: '', photoAdded: false, date: '', plotName: '' });
-                    setScreen('addCrop');
+                  onAddField={() => {
+                    setAddForm(EMPTY_ADD_FIELD_FORM);
+                    setAddFieldError(null);
+                    setScreen('addField');
                   }}
                 />
               )}
 
               {screen === 'detail' && (
                 <FieldDetailScreen
+                  key={selectedField.id}
                   palette={palette}
                   field={selectedField}
+                  cropOptions={referenceCrops}
+                  soilTypeOptions={referenceSoilTypes}
                   editingCrop={editingCrop}
                   actionMessage={actionMessage}
                   onStartEditCrop={() => setEditingCrop(true)}
@@ -380,10 +429,8 @@ export default function App() {
                   onAccept={() => setActionMessage('Recommendation accepted.')}
                   onOverride={() => setActionMessage('Marked as overridden by farmer.')}
                   onDismiss={() => setActionMessage('Recommendation dismissed.')}
-                  onUpdateName={updateFieldName}
-                  onUpdateAcres={updateFieldAcres}
-                  onCommitName={commitFieldName}
-                  onCommitAcres={commitFieldAcres}
+                  onSaveField={saveFieldEdits}
+                  onDeleteField={deleteSelectedField}
                 />
               )}
 
@@ -420,20 +467,27 @@ export default function App() {
                 />
               )}
 
-              {screen === 'addCrop' && (
-                <AddCropScreen
+              {screen === 'addField' && (
+                <AddFieldScreen
                   palette={palette}
                   form={addForm}
-                  plotNames={plotNames}
-                  saving={addCropSaving}
-                  error={addCropError}
-                  onChangeCropName={(cropName) => setAddForm((s) => ({ ...s, cropName }))}
-                  onChangeDate={(date) => setAddForm((s) => ({ ...s, date }))}
+                  cropOptions={referenceCrops}
+                  soilTypeOptions={referenceSoilTypes}
+                  saving={addFieldSaving}
+                  error={addFieldError}
                   onChangePlotName={(plotName) => setAddForm((s) => ({ ...s, plotName }))}
-                  onTogglePhoto={() =>
-                    setAddForm((s) => ({ ...s, photoAdded: !s.photoAdded, cropName: s.cropName || CROP_OPTIONS[0] }))
+                  onChangeAcres={(acres) => setAddForm((s) => ({ ...s, acres }))}
+                  onChangeSoilPh={(soilPh) => setAddForm((s) => ({ ...s, soilPh }))}
+                  onToggleSoilPhUnknown={() =>
+                    setAddForm((s) => ({ ...s, soilPhUnknown: !s.soilPhUnknown, soilPh: s.soilPhUnknown ? s.soilPh : '' }))
                   }
-                  onSave={saveAddCrop}
+                  onChangeSoilType={(soilType) => setAddForm((s) => ({ ...s, soilType }))}
+                  onAddCropEntry={onAddCropEntry}
+                  onRemoveCropEntry={onRemoveCropEntry}
+                  onChangeCropEntryCrop={onChangeCropEntryCrop}
+                  onChangeCropEntryMonth={onChangeCropEntryMonth}
+                  onSetCurrentEntry={onSetCurrentEntry}
+                  onSave={saveAddField}
                   onCancel={() => setScreen('dashboard')}
                 />
               )}
