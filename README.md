@@ -1,46 +1,91 @@
-# hackthe6ix
+# hackthe6ix — Field Intelligence
 
-This project now shows a simple pattern for asking an AI model questions using your own data:
+A mobile-first web app that helps row-crop farmers make field-level
+decisions across the growing cycle: whether to rotate a crop, what's
+actually growing or intruding in a field right now, how long a planted
+crop should remain before rotation, and where weed pressure is
+concentrated. Implemented from the "Field Intelligence App" design
+(see `PRD.md`-style goals: a rotation-timing model + camera-based
+identification, unified around a field/season data model).
 
-1. Put your data in a JSON file as a list of strings or objects with `title`, `question`, `label`, `text`, `answer`, `content`, `body`, and optional `tags` fields.
-2. You can also store a top-level object with `question` plus `documents`, `items`, `entries`, or `data`.
-3. The app picks the most relevant context from that file.
-4. It calls an OpenAI-compatible chat API and prints the answer.
+This is a frontend prototype: all data is seeded/mocked client-side
+(no backend, no real ML/CV model) so the full UI and interaction flow
+can be reviewed and demoed end-to-end.
 
-Run it like this:
+## Features / screens
+
+- **Sign in** — mock auth gate (any non-empty email/password)
+- **Fields dashboard** — card grid and birdseye map view of all fields,
+  with search, status filters (Rotate now / Marginal / Safe / Empty),
+  and a bulk-edit mode to clear crops across multiple fields at once
+- **Field detail** — three tabs: **Field** (edit the plot's name and
+  acreage), **Crop** (rotation recommendation, risk score with
+  plain-language reasoning, confidence + last-scan date, suggested next
+  crops, and accept / override / dismiss actions), and **History**
+  (past plantings for that plot — crop, season, and outcome notes;
+  changing or clearing the current crop automatically logs it here)
+- **Identify** — point a camera at a plant (live preview via
+  `getUserMedia`, falls back to a placeholder if no camera permission)
+  or describe it in text; returns a mocked weed/crop identification
+  with a confidence score and a "flag as weed" action
+- **Add crop** — log a new planting against an existing or new plot,
+  with optional photo-based auto-identify
+- **Profile** — farmer/farm info, scanning equipment, measurement
+  units, and a status-color theme toggle (traffic-light / earth-tone)
+
+## Stack
+
+React 19 + TypeScript + Vite, styled with plain inline styles (no CSS
+framework). No backend — state lives in React and resets on reload.
+
+## Prerequisites
+
+- Node.js `20.19+` or `22.12+` (required by Vite 8)
+- npm
+
+## Run it
 
 ```bash
-set AI_API_KEY=your_key
-python main.py "What is our refund policy?" --data-file my-data.json
+npm install
+npm run dev
 ```
 
-Optional environment variables:
+Then open http://localhost:3000
+
+## Other scripts
 
 ```bash
-set AI_BASE_URL=https://api.openai.com
-set AI_MODEL=gpt-4o-mini
+npm run build    # type-check (tsc -b) + production build to dist/
+npm run preview  # serve the production build locally
+npm run lint     # eslint
 ```
 
-The data file can look like this:
+## Project structure
 
-```json
-[
-	"Short standalone fact",
-	{ "title": "Refunds", "text": "Refunds are available within 30 days.", "tags": ["policy", "support"] }
-]
+```
+src/
+  App.tsx              top-level state + screen routing
+  types.ts              shared TypeScript types
+  palette.ts             color palettes + status labels
+  seedData.ts            mock fields and crop options
+  lib/
+    fieldHelpers.ts       status/field derivation helpers
+    formStyles.ts         shared input/label style helpers
+  components/
+    Header.tsx, BottomNav.tsx, MapPopup.tsx, FieldThumb.tsx
+  screens/
+    LoginScreen.tsx, DashboardScreen.tsx, FieldDetailScreen.tsx,
+    IdentifyScreen.tsx, AddCropScreen.tsx, ProfileScreen.tsx
 ```
 
-Or like this:
+## Other scaffolding in this repo
 
-```json
-{
-	"question": "What is the refund policy?",
-	"documents": ["Refunds are available within 30 days."]
-}
-```
-
-Run the tests with:
+`main.py`, `requirements*.txt`, and `tests/test_main.py` are an
+early Python scaffold (unrelated to the app above — pending sync with
+its author). Run it with:
 
 ```bash
+python main.py
+python main.py Karen
 python -m unittest discover -s tests
 ```
