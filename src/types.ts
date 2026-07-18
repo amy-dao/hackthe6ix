@@ -26,7 +26,7 @@ export interface Field {
   soilType: string | null;
 }
 
-export type Screen = 'dashboard' | 'detail' | 'camera' | 'profile' | 'addField';
+export type Screen = 'dashboard' | 'detail' | 'camera' | 'recommendation' | 'profile' | 'addField';
 
 export type DashboardView = 'cards' | 'map';
 
@@ -64,4 +64,18 @@ export interface AddFieldForm {
 export interface LoginForm {
   email: string;
   password: string;
+}
+
+export interface CropRotationRecommendation {
+  recommendedCrop: string;
+  rotationDate: string;
+}
+
+export interface HistoryTrackingForm {
+  cropName: string;
+  datePlanted: string;
+  harvestDate: string;
+  yieldAmount: string;
+  fertilizerUsed: string;
+  pesticidesApplied: string;
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   AddFieldForm,
   ColorMode,
+  CropRotationRecommendation,
   DashboardView,
   Field,
   InputMode,
@@ -30,11 +31,13 @@ import DashboardScreen from './screens/DashboardScreen';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
 import AddFieldScreen from './screens/AddFieldScreen';
+import RecommendationScreen from './screens/CropRecommendationScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
+  recommendation: { eyebrow: 'Field Intelligence', title: 'Recommendation' },
   profile: { eyebrow: 'Field Intelligence', title: 'Profile' },
   addField: { eyebrow: 'Field Intelligence', title: 'Add Field' },
 };
@@ -80,6 +83,10 @@ export default function App() {
   const [referenceCrops, setReferenceCrops] = useState<string[]>([]);
   const [referenceSoilTypes, setReferenceSoilTypes] = useState<string[]>([]);
 
+  const [recommendation, setRecommendation] = useState<CropRotationRecommendation | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     fetchFields()
@@ -113,6 +120,13 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (screen === 'recommendation' && !recommendation && !recommendationLoading) {
+      fetchRecommendation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
@@ -150,6 +164,7 @@ export default function App() {
   const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addField' ? 'dashboard' : screen) as
     | 'dashboard'
     | 'camera'
+    | 'recommendation'
     | 'profile';
   const showBack = screen === 'detail' || screen === 'addField' || (screen === 'camera' && captured);
   const header =
@@ -271,6 +286,30 @@ export default function App() {
       back();
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : 'Failed to delete field.');
+    }
+  }
+
+  async function fetchRecommendation() {
+    setRecommendationLoading(true);
+    setRecommendationError(null);
+    try {
+      // TODO: replace with the real AI model call once the endpoint is available,
+      // e.g. const result = await getCropRotationRecommendation(selectedField?.id);
+      const result: CropRotationRecommendation = await new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              recommendedCrop: 'Soybeans',
+              rotationDate: 'October 15, 2026',
+            }),
+          400,
+        ),
+      );
+      setRecommendation(result);
+    } catch (err) {
+      setRecommendationError(err instanceof Error ? err.message : 'Failed to load recommendation.');
+    } finally {
+      setRecommendationLoading(false);
     }
   }
 
@@ -464,6 +503,16 @@ export default function App() {
                   identifyError={identifyError}
                   flagged={flagged}
                   onToggleFlag={() => setFlagged((v) => !v)}
+                />
+              )}
+
+              {screen === 'recommendation' && (
+                <RecommendationScreen
+                  palette={palette}
+                  recommendation={recommendation}
+                  loading={recommendationLoading}
+                  error={recommendationError}
+                  onRetry={fetchRecommendation}
                 />
               )}
 
