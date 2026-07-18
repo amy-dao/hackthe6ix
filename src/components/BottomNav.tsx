@@ -3,13 +3,19 @@ import type { Screen } from '../types';
 
 interface BottomNavProps {
   palette: Palette;
-  activeTab: 'dashboard' | 'camera' | 'profile';
+  activeTab: 'dashboard' | 'camera' | 'history' | 'profile';
   onNavigate: (screen: Screen) => void;
 }
 
-const TABS: { key: 'dashboard' | 'camera' | 'profile'; label: string; screen: Screen; shape: 'square' | 'circle' | 'ring' }[] = [
+const TABS: {
+  key: 'dashboard' | 'camera' | 'history' | 'profile';
+  label: string;
+  screen: Screen;
+  shape: 'square' | 'circle' | 'ring' | 'diamond';
+}[] = [
   { key: 'dashboard', label: 'Fields', screen: 'dashboard', shape: 'square' },
   { key: 'camera', label: 'Identify', screen: 'camera', shape: 'circle' },
+  { key: 'history', label: 'History', screen: 'history', shape: 'diamond' },
   { key: 'profile', label: 'Profile', screen: 'profile', shape: 'ring' },
 ];
 
@@ -29,10 +35,11 @@ export default function BottomNav({ palette, activeTab, onNavigate }: BottomNavP
               style={{
                 width: 20,
                 height: 20,
-                borderRadius: tab.shape === 'circle' || tab.shape === 'ring' ? '50%' : 5,
-                margin: '0 auto 4px',
+                borderRadius: tab.shape === 'circle' || tab.shape === 'ring' ? '50%' : tab.shape === 'diamond' ? 4 : 5,
+                margin: tab.shape === 'diamond' ? '2px auto 6px' : '0 auto 4px',
                 background: tab.shape === 'ring' ? 'transparent' : color,
                 border: tab.shape === 'ring' ? `2px solid ${color}` : 'none',
+                transform: tab.shape === 'diamond' ? 'rotate(45deg)' : 'none',
               }}
             />
             <div style={{ fontSize: 10.5, fontWeight: 700, color }}>{tab.label}</div>
