@@ -1,11 +1,11 @@
 export type FieldStatus = 'rotate' | 'marginal' | 'safe' | 'empty';
-
+ 
 export interface PlantingRecord {
   crop: string;
   period: string;
   note?: string;
 }
-
+ 
 export interface Field {
   id: string;
   name: string;
@@ -21,17 +21,17 @@ export interface Field {
   durationRange: string;
   history: PlantingRecord[];
 }
-
-export type Screen = 'dashboard' | 'detail' | 'camera' | 'history' | 'profile' | 'addCrop';
-
+ 
+export type Screen = 'dashboard' | 'detail' | 'camera' | 'recommendation' | 'profile' | 'addCrop';
+ 
 export type DashboardView = 'cards' | 'map';
-
+ 
 export type InputMode = 'photo' | 'text';
-
+ 
 export type ColorMode = 'traffic-light' | 'earth-tone';
-
+ 
 export type StatusFilter = 'all' | FieldStatus;
-
+ 
 export interface Profile {
   name: string;
   farmName: string;
@@ -41,29 +41,20 @@ export interface Profile {
   equipment: 'handheld' | 'drone' | 'tractor';
   units: 'acres' | 'hectares';
 }
-
+ 
 export interface AddCropForm {
   cropName: string;
   photoAdded: boolean;
   date: string;
   plotName: string;
 }
-
+ 
 export interface LoginForm {
   email: string;
   password: string;
 }
-
-export interface HistoryTrackingForm {
-  cropName: string;
-  datePlanted: string;
-  harvestDate: string;
-  yieldAmount: string;
-  fertilizerUsed: string;
-  pesticidesApplied: string;
-}
-
+ 
 export interface CropRotationRecommendation {
-  currentCrop: string;
   recommendedCrop: string;
+  rotationDate: string;
 }

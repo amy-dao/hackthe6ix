@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   AddCropForm,
   ColorMode,
+  CropRotationRecommendation,
   DashboardView,
   Field,
-  HistoryTrackingForm,
   InputMode,
   LoginForm,
   Profile,
@@ -31,24 +31,15 @@ import DashboardScreen from './screens/DashboardScreen';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
 import AddCropScreen from './screens/AddCropScreen';
-import HistoryTrackingScreen from './screens/HistoryTrackingScreen';
+import RecommendationScreen from './screens/CropRecommendationScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
-  history: { eyebrow: 'Field Intelligence', title: 'History Tracking' },
+  recommendation: { eyebrow: 'Field Intelligence', title: 'Recommendation' },
   profile: { eyebrow: 'Field Intelligence', title: 'Profile' },
   addCrop: { eyebrow: 'Field Intelligence', title: 'Add Crop' },
-};
-
-const EMPTY_HISTORY_FORM: HistoryTrackingForm = {
-  cropName: '',
-  datePlanted: '',
-  harvestDate: '',
-  yieldAmount: '',
-  fertilizerUsed: '',
-  pesticidesApplied: '',
 };
 
 export default function App() {
@@ -77,9 +68,9 @@ export default function App() {
   const [addCropSaving, setAddCropSaving] = useState(false);
   const [addCropError, setAddCropError] = useState<string | null>(null);
 
-  const [historyForm, setHistoryForm] = useState<HistoryTrackingForm>(EMPTY_HISTORY_FORM);
-  const [historySaving, setHistorySaving] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [recommendation, setRecommendation] = useState<CropRotationRecommendation | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +89,13 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (screen === 'recommendation' && !recommendation && !recommendationLoading) {
+      fetchRecommendation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
@@ -132,12 +130,11 @@ export default function App() {
   const selectedField = fields.find((f) => f.id === selectedFieldId) ?? fields[0];
   const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
   const plotNames = useMemo(() => [...new Set(fields.map((f) => f.name))], [fields]);
-  const cropNames = useMemo(() => [...new Set(fields.map((f) => f.crop).filter(Boolean))], [fields]);
 
   const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addCrop' ? 'dashboard' : screen) as
     | 'dashboard'
     | 'camera'
-    | 'history'
+    | 'recommendation'
     | 'profile';
   const showBack = screen === 'detail' || screen === 'addCrop' || (screen === 'camera' && captured);
   const header =
@@ -227,25 +224,28 @@ export default function App() {
     }
   }
 
-  async function saveHistory() {
-    const { cropName, datePlanted } = historyForm;
-    if (!cropName.trim() || !datePlanted.trim()) return;
-    setHistorySaving(true);
-    setHistoryError(null);
+  async function fetchRecommendation() {
+    setRecommendationLoading(true);
+    setRecommendationError(null);
     try {
-      // TODO: wire up to a real history API endpoint once available.
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setHistoryForm(EMPTY_HISTORY_FORM);
+      // TODO: replace with the real AI model call once the endpoint is available,
+      // e.g. const result = await getCropRotationRecommendation(selectedField?.id);
+      const result: CropRotationRecommendation = await new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              recommendedCrop: 'Soybeans',
+              rotationDate: 'October 15, 2026',
+            }),
+          400,
+        ),
+      );
+      setRecommendation(result);
     } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : 'Failed to save history.');
+      setRecommendationError(err instanceof Error ? err.message : 'Failed to load recommendation.');
     } finally {
-      setHistorySaving(false);
+      setRecommendationLoading(false);
     }
-  }
-
-  function cancelHistory() {
-    setHistoryForm(EMPTY_HISTORY_FORM);
-    setHistoryError(null);
   }
 
   async function clearCropInDetail() {
@@ -459,21 +459,13 @@ export default function App() {
                 />
               )}
 
-              {screen === 'history' && (
-                <HistoryTrackingScreen
+              {screen === 'recommendation' && (
+                <RecommendationScreen
                   palette={palette}
-                  form={historyForm}
-                  cropNames={cropNames}
-                  saving={historySaving}
-                  error={historyError}
-                  onChangeCropName={(cropName) => setHistoryForm((s) => ({ ...s, cropName }))}
-                  onChangeDatePlanted={(datePlanted) => setHistoryForm((s) => ({ ...s, datePlanted }))}
-                  onChangeHarvestDate={(harvestDate) => setHistoryForm((s) => ({ ...s, harvestDate }))}
-                  onChangeYield={(yieldAmount) => setHistoryForm((s) => ({ ...s, yieldAmount }))}
-                  onChangeFertilizerUsed={(fertilizerUsed) => setHistoryForm((s) => ({ ...s, fertilizerUsed }))}
-                  onChangePesticidesApplied={(pesticidesApplied) => setHistoryForm((s) => ({ ...s, pesticidesApplied }))}
-                  onSave={saveHistory}
-                  onCancel={cancelHistory}
+                  recommendation={recommendation}
+                  loading={recommendationLoading}
+                  error={recommendationError}
+                  onRetry={fetchRecommendation}
                 />
               )}
 

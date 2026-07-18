@@ -3,19 +3,19 @@ import type { Screen } from '../types';
 
 interface BottomNavProps {
   palette: Palette;
-  activeTab: 'dashboard' | 'camera' | 'history' | 'profile';
+  activeTab: 'dashboard' | 'camera' | 'recommendation' | 'profile';
   onNavigate: (screen: Screen) => void;
 }
 
 const TABS: {
-  key: 'dashboard' | 'camera' | 'history' | 'profile';
+  key: 'dashboard' | 'camera' | 'recommendation' | 'profile';
   label: string;
   screen: Screen;
   shape: 'square' | 'circle' | 'ring' | 'diamond';
 }[] = [
   { key: 'dashboard', label: 'Fields', screen: 'dashboard', shape: 'square' },
   { key: 'camera', label: 'Identify', screen: 'camera', shape: 'circle' },
-  { key: 'history', label: 'History', screen: 'history', shape: 'diamond' },
+  { key: 'recommendation', label: 'Recommend', screen: 'recommendation', shape: 'diamond' },
   { key: 'profile', label: 'Profile', screen: 'profile', shape: 'ring' },
 ];
 
