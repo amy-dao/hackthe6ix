@@ -53,3 +53,17 @@ export interface LoginForm {
   email: string;
   password: string;
 }
+
+export interface HistoryTrackingForm {
+  cropName: string;
+  datePlanted: string;
+  harvestDate: string;
+  yieldAmount: string;
+  fertilizerUsed: string;
+  pesticidesApplied: string;
+}
+
+export interface CropRotationRecommendation {
+  currentCrop: string;
+  recommendedCrop: string;
+}

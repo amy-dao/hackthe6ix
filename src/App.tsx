@@ -4,6 +4,7 @@ import type {
   ColorMode,
   DashboardView,
   Field,
+  HistoryTrackingForm,
   InputMode,
   LoginForm,
   Profile,
@@ -30,13 +31,24 @@ import DashboardScreen from './screens/DashboardScreen';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
 import AddCropScreen from './screens/AddCropScreen';
+import HistoryTrackingScreen from './screens/HistoryTrackingScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
+  history: { eyebrow: 'Field Intelligence', title: 'History Tracking' },
   profile: { eyebrow: 'Field Intelligence', title: 'Profile' },
   addCrop: { eyebrow: 'Field Intelligence', title: 'Add Crop' },
+};
+
+const EMPTY_HISTORY_FORM: HistoryTrackingForm = {
+  cropName: '',
+  datePlanted: '',
+  harvestDate: '',
+  yieldAmount: '',
+  fertilizerUsed: '',
+  pesticidesApplied: '',
 };
 
 export default function App() {
@@ -64,6 +76,10 @@ export default function App() {
   const [addForm, setAddForm] = useState<AddCropForm>({ cropName: '', photoAdded: false, date: '', plotName: '' });
   const [addCropSaving, setAddCropSaving] = useState(false);
   const [addCropError, setAddCropError] = useState<string | null>(null);
+
+  const [historyForm, setHistoryForm] = useState<HistoryTrackingForm>(EMPTY_HISTORY_FORM);
+  const [historySaving, setHistorySaving] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,10 +132,12 @@ export default function App() {
   const selectedField = fields.find((f) => f.id === selectedFieldId) ?? fields[0];
   const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
   const plotNames = useMemo(() => [...new Set(fields.map((f) => f.name))], [fields]);
+  const cropNames = useMemo(() => [...new Set(fields.map((f) => f.crop).filter(Boolean))], [fields]);
 
   const activeTab = (screen === 'detail' ? 'dashboard' : screen === 'addCrop' ? 'dashboard' : screen) as
     | 'dashboard'
     | 'camera'
+    | 'history'
     | 'profile';
   const showBack = screen === 'detail' || screen === 'addCrop' || (screen === 'camera' && captured);
   const header =
@@ -207,6 +225,27 @@ export default function App() {
     } finally {
       setAddCropSaving(false);
     }
+  }
+
+  async function saveHistory() {
+    const { cropName, datePlanted } = historyForm;
+    if (!cropName.trim() || !datePlanted.trim()) return;
+    setHistorySaving(true);
+    setHistoryError(null);
+    try {
+      // TODO: wire up to a real history API endpoint once available.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      setHistoryForm(EMPTY_HISTORY_FORM);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : 'Failed to save history.');
+    } finally {
+      setHistorySaving(false);
+    }
+  }
+
+  function cancelHistory() {
+    setHistoryForm(EMPTY_HISTORY_FORM);
+    setHistoryError(null);
   }
 
   async function clearCropInDetail() {
@@ -417,6 +456,24 @@ export default function App() {
                   identifyError={identifyError}
                   flagged={flagged}
                   onToggleFlag={() => setFlagged((v) => !v)}
+                />
+              )}
+
+              {screen === 'history' && (
+                <HistoryTrackingScreen
+                  palette={palette}
+                  form={historyForm}
+                  cropNames={cropNames}
+                  saving={historySaving}
+                  error={historyError}
+                  onChangeCropName={(cropName) => setHistoryForm((s) => ({ ...s, cropName }))}
+                  onChangeDatePlanted={(datePlanted) => setHistoryForm((s) => ({ ...s, datePlanted }))}
+                  onChangeHarvestDate={(harvestDate) => setHistoryForm((s) => ({ ...s, harvestDate }))}
+                  onChangeYield={(yieldAmount) => setHistoryForm((s) => ({ ...s, yieldAmount }))}
+                  onChangeFertilizerUsed={(fertilizerUsed) => setHistoryForm((s) => ({ ...s, fertilizerUsed }))}
+                  onChangePesticidesApplied={(pesticidesApplied) => setHistoryForm((s) => ({ ...s, pesticidesApplied }))}
+                  onSave={saveHistory}
+                  onCancel={cancelHistory}
                 />
               )}
 
