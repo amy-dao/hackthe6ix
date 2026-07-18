@@ -1,1 +1,76 @@
-# hackthe6ix
+# hackthe6ix — Field Intelligence
+
+A mobile-first web app that helps row-crop farmers make field-level
+decisions across the growing cycle: whether to rotate a crop, what's
+actually growing or intruding in a field right now, how long a planted
+crop should remain before rotation, and where weed pressure is
+concentrated. Implemented from the "Field Intelligence App" design
+(see `PRD.md`-style goals: a rotation-timing model + camera-based
+identification, unified around a field/season data model).
+
+This is a frontend prototype: all data is seeded/mocked client-side
+(no backend, no real ML/CV model) so the full UI and interaction flow
+can be reviewed and demoed end-to-end.
+
+## Features / screens
+
+- **Sign in** — mock auth gate (any non-empty email/password)
+- **Fields dashboard** — card grid and birdseye map view of all fields,
+  with search, status filters (Rotate now / Marginal / Safe / Empty),
+  and a bulk-edit mode to clear crops across multiple fields at once
+- **Field detail** — rotation recommendation, risk score with
+  plain-language reasoning, confidence + last-scan date, suggested next
+  crops, and accept / override / dismiss actions
+- **Identify** — point a camera at a plant (live preview via
+  `getUserMedia`, falls back to a placeholder if no camera permission)
+  or describe it in text; returns a mocked weed/crop identification
+  with a confidence score and a "flag as weed" action
+- **Add crop** — log a new planting against an existing or new plot,
+  with optional photo-based auto-identify
+- **Profile** — farmer/farm info, scanning equipment, measurement
+  units, and a status-color theme toggle (traffic-light / earth-tone)
+
+## Stack
+
+React 19 + TypeScript + Vite, styled with plain inline styles (no CSS
+framework). No backend — state lives in React and resets on reload.
+
+## Prerequisites
+
+- Node.js `20.19+` or `22.12+` (required by Vite 8)
+- npm
+
+## Run it
+
+```bash
+npm install
+npm run dev
+```
+
+Then open http://localhost:3000
+
+## Other scripts
+
+```bash
+npm run build    # type-check (tsc -b) + production build to dist/
+npm run preview  # serve the production build locally
+npm run lint     # eslint
+```
+
+## Project structure
+
+```
+src/
+  App.tsx              top-level state + screen routing
+  types.ts              shared TypeScript types
+  palette.ts             color palettes + status labels
+  seedData.ts            mock fields and crop options
+  lib/
+    fieldHelpers.ts       status/field derivation helpers
+    formStyles.ts         shared input/label style helpers
+  components/
+    Header.tsx, BottomNav.tsx, MapPopup.tsx, FieldThumb.tsx
+  screens/
+    LoginScreen.tsx, DashboardScreen.tsx, FieldDetailScreen.tsx,
+    IdentifyScreen.tsx, AddCropScreen.tsx, ProfileScreen.tsx
+```
