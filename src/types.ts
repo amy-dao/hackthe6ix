@@ -22,7 +22,7 @@ export interface Field {
   history: PlantingRecord[];
 }
 
-export type Screen = 'dashboard' | 'detail' | 'camera' | 'profile' | 'addCrop';
+export type Screen = 'dashboard' | 'detail' | 'camera' | 'history' | 'profile' | 'addCrop';
 
 export type DashboardView = 'cards' | 'map';
 
