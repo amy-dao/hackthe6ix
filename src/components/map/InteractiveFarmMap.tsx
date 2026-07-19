@@ -9,6 +9,7 @@ import {
   useMapEvents,
 } from 'react-leaflet';
 import L from 'leaflet';
+import type { Palette } from '../../palette';
 import type { DrawMode, FarmState, LngLat, Subplot } from '../../types';
 import {
   areaAcres,
@@ -20,8 +21,10 @@ import {
   toLatLng,
 } from '../../lib/geo';
 import { emptySubplotData, nextSubplotColor } from '../../lib/farmConstants';
+import LocationSearchBar from './LocationSearchBar';
 
 interface InteractiveFarmMapProps {
+  palette: Palette;
   farm: FarmState;
   drawMode: DrawMode;
   selectedSubplotId: string | null;
@@ -44,6 +47,25 @@ function FitBounds({ coords }: { coords: LngLat[] | null }) {
     const latLngs = toLatLng(coords);
     map.fitBounds(L.latLngBounds(latLngs), { padding: [40, 40], maxZoom: 16 });
   }, [coords, map]);
+
+  return null;
+}
+
+interface FlyToTarget {
+  lat: number;
+  lng: number;
+  token: number;
+}
+
+function FlyToSearchResult({ target }: { target: FlyToTarget | null }) {
+  const map = useMap();
+  const tokenRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!target || target.token === tokenRef.current) return;
+    tokenRef.current = target.token;
+    map.flyTo([target.lat, target.lng], 14);
+  }, [target, map]);
 
   return null;
 }
@@ -187,6 +209,7 @@ function DrawingController({
 }
 
 export default function InteractiveFarmMap({
+  palette,
   farm,
   drawMode,
   selectedSubplotId,
@@ -199,6 +222,7 @@ export default function InteractiveFarmMap({
   const [draft, setDraft] = useState<LngLat[]>([]);
   const [cursor, setCursor] = useState<LngLat | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [searchTarget, setSearchTarget] = useState<FlyToTarget | null>(null);
 
   // Clear the in-progress draft when drawMode changes away from a drawing
   // mode. Adjusted during render (not in an effect) per React's guidance for
@@ -239,6 +263,7 @@ export default function InteractiveFarmMap({
       />
 
       <FitBounds coords={farm.farmPolygon} />
+      <FlyToSearchResult target={searchTarget} />
 
       <DrawingController
         drawMode={drawMode}
@@ -336,6 +361,11 @@ export default function InteractiveFarmMap({
           }}
         />
       )}
+
+      <LocationSearchBar
+        palette={palette}
+        onLocate={(lat, lng) => setSearchTarget({ lat, lng, token: Date.now() })}
+      />
     </MapContainer>
   );
 }

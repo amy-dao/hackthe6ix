@@ -222,6 +222,7 @@ export default function FarmMapScreen({
         }}
       >
         <InteractiveFarmMap
+          palette={palette}
           farm={farm}
           drawMode={drawMode}
           selectedSubplotId={selectedSubplotId}
