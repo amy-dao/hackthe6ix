@@ -115,3 +115,7 @@ export function signup(username: string, password: string): Promise<User> {
 export function login(username: string, password: string): Promise<User> {
   return request<User>('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
 }
+
+export function updateAccount(updates: { username?: string; password?: string }): Promise<User> {
+  return request<User>('/account', { method: 'PATCH', body: JSON.stringify(updates) });
+}

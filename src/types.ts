@@ -88,10 +88,6 @@ export interface Profile {
   name: string;
   farmName: string;
   location: string;
-  acres: string;
-  crops: string;
-  equipment: 'handheld' | 'drone' | 'tractor';
-  units: 'acres' | 'hectares';
 }
  
 export interface CropEntryForm {

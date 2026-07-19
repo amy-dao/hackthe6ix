@@ -109,3 +109,8 @@ class UserOut(BaseModel):
     id: str
     username: str
     token: str
+
+
+class UpdateAccountRequest(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=1, max_length=40)
+    password: Optional[str] = None

@@ -32,6 +32,7 @@ import {
   setFieldCrop,
   signup as signupApi,
   syncField as syncFieldApi,
+  updateAccount as updateAccountApi,
   updateField as updateFieldApi,
 } from './lib/api';
 import Header from './components/Header';
@@ -77,7 +78,7 @@ function readInitialSession() {
 export default function App() {
   const saved = useMemo(() => readInitialSession(), []);
 
-  const [colorMode, setColorMode] = useState<ColorMode>('traffic-light');
+  const colorMode: ColorMode = 'traffic-light';
   const [authed, setAuthed] = useState(Boolean(saved?.userName));
   const [introSeen, setIntroSeen] = useState(Boolean(saved?.introSeen));
   const [userName, setUserName] = useState(saved?.userName ?? '');
@@ -184,11 +185,9 @@ export default function App() {
     name: saved?.userName || 'Jordan Hale',
     farmName: 'Hale Family Farm',
     location: 'Cedar County, IA',
-    acres: saved ? String(saved.farm.farmAreaAcres) : '183',
-    crops: 'Corn, Soybeans, Wheat',
-    equipment: 'handheld',
-    units: 'acres',
   });
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [accountError, setAccountError] = useState('');
 
   const palette = palettes[colorMode];
 
@@ -255,6 +254,21 @@ export default function App() {
     setLoginError('');
   }
 
+  async function updateAccount(updates: { username?: string; password?: string }) {
+    setAccountSaving(true);
+    setAccountError('');
+    try {
+      const user = await updateAccountApi(updates);
+      setAuthToken(user.token);
+      setSessionToken(user.token);
+      setUserName(user.username);
+    } catch (err) {
+      setAccountError(err instanceof Error ? err.message : 'Failed to update account.');
+    } finally {
+      setAccountSaving(false);
+    }
+  }
+
   function signOut() {
     setAuthToken(null);
     setAuthed(false);
@@ -269,6 +283,7 @@ export default function App() {
     setFields([]);
     setFieldsLoading(true);
     setFieldsError(null);
+    setAccountError('');
     clearSession();
   }
 
@@ -285,7 +300,6 @@ export default function App() {
       subplots: prev.farmPolygon ? [] : prev.subplots,
     }));
     setSelectedSubplotId(null);
-    setProfile((p) => ({ ...p, acres: String(acres) }));
     setDrawMode('idle');
     setDraftAreaAcres(0);
   }
@@ -770,11 +784,11 @@ export default function App() {
                 <ProfileScreen
                   palette={palette}
                   profile={profile}
-                  colorMode={colorMode}
+                  username={userName}
+                  accountSaving={accountSaving}
+                  accountError={accountError}
                   onChangeField={(field, value) => setProfile((s) => ({ ...s, [field]: value }))}
-                  onSelectEquipment={(equipment) => setProfile((s) => ({ ...s, equipment }))}
-                  onSelectUnits={(units) => setProfile((s) => ({ ...s, units }))}
-                  onSelectColorMode={setColorMode}
+                  onUpdateAccount={updateAccount}
                   onSignOut={signOut}
                 />
               )}

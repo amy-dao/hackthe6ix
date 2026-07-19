@@ -1,44 +1,46 @@
+import { useEffect, useState } from 'react';
 import type { Palette } from '../palette';
-import type { ColorMode, Profile } from '../types';
+import type { Profile } from '../types';
 import { fieldLabelStyle, fieldInputStyle } from '../lib/formStyles';
 
 interface ProfileScreenProps {
   palette: Palette;
   profile: Profile;
-  colorMode: ColorMode;
+  username: string;
+  accountSaving: boolean;
+  accountError: string;
   onChangeField: (field: keyof Profile, value: string) => void;
-  onSelectEquipment: (value: Profile['equipment']) => void;
-  onSelectUnits: (value: Profile['units']) => void;
-  onSelectColorMode: (value: ColorMode) => void;
+  onUpdateAccount: (updates: { username?: string; password?: string }) => void;
   onSignOut: () => void;
 }
-
-const EQUIPMENT_OPTIONS: { id: Profile['equipment']; label: string }[] = [
-  { id: 'handheld', label: 'Handheld' },
-  { id: 'drone', label: 'Drone' },
-  { id: 'tractor', label: 'Tractor-mounted' },
-];
-
-const UNIT_OPTIONS: { id: Profile['units']; label: string }[] = [
-  { id: 'acres', label: 'Acres' },
-  { id: 'hectares', label: 'Hectares' },
-];
-
-const COLOR_MODE_OPTIONS: { id: ColorMode; label: string }[] = [
-  { id: 'traffic-light', label: 'Traffic light' },
-  { id: 'earth-tone', label: 'Earth tone' },
-];
 
 export default function ProfileScreen({
   palette,
   profile,
-  colorMode,
+  username,
+  accountSaving,
+  accountError,
   onChangeField,
-  onSelectEquipment,
-  onSelectUnits,
-  onSelectColorMode,
+  onUpdateAccount,
   onSignOut,
 }: ProfileScreenProps) {
+  const [newUsername, setNewUsername] = useState(username);
+  const [newPassword, setNewPassword] = useState('');
+
+  useEffect(() => {
+    setNewUsername(username);
+  }, [username]);
+
+  function handleSaveAccount() {
+    const trimmed = newUsername.trim();
+    const updates: { username?: string; password?: string } = {};
+    if (trimmed && trimmed !== username) updates.username = trimmed;
+    if (newPassword) updates.password = newPassword;
+    if (!updates.username && !updates.password) return;
+    onUpdateAccount(updates);
+    setNewPassword('');
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -59,97 +61,50 @@ export default function ProfileScreen({
             style={fieldInputStyle(palette)}
           />
         </div>
+      </div>
+
+      <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ ...fieldLabelStyle(palette), marginBottom: 0 }}>Account</div>
         <div>
-          <div style={fieldLabelStyle(palette)}>Total acreage</div>
-          <input value={profile.acres} onChange={(e) => onChangeField('acres', e.target.value)} style={fieldInputStyle(palette)} />
+          <div style={fieldLabelStyle(palette)}>Username</div>
+          <input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            autoComplete="username"
+            style={fieldInputStyle(palette)}
+          />
         </div>
         <div>
-          <div style={fieldLabelStyle(palette)}>Primary crops</div>
-          <input value={profile.crops} onChange={(e) => onChangeField('crops', e.target.value)} style={fieldInputStyle(palette)} />
+          <div style={fieldLabelStyle(palette)}>New password</div>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Leave blank to keep current password"
+            autoComplete="new-password"
+            style={fieldInputStyle(palette)}
+          />
         </div>
-      </div>
 
-      <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ ...fieldLabelStyle(palette), marginBottom: 0 }}>Scanning equipment</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {EQUIPMENT_OPTIONS.map((opt) => {
-            const active = profile.equipment === opt.id;
-            return (
-              <div
-                key={opt.id}
-                onClick={() => onSelectEquipment(opt.id)}
-                style={{
-                  flex: 1,
-                  textAlign: 'center',
-                  padding: '9px 4px',
-                  borderRadius: 9,
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: active ? palette.dark : palette.bg,
-                  color: active ? palette.offwhite : palette.muted,
-                }}
-              >
-                {opt.label}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        {accountError && (
+          <div style={{ fontSize: 12.5, color: palette.rotate.bg, fontWeight: 600 }}>{accountError}</div>
+        )}
 
-      <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ ...fieldLabelStyle(palette), marginBottom: 0 }}>Measurement units</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {UNIT_OPTIONS.map((opt) => {
-            const active = profile.units === opt.id;
-            return (
-              <div
-                key={opt.id}
-                onClick={() => onSelectUnits(opt.id)}
-                style={{
-                  flex: 1,
-                  textAlign: 'center',
-                  padding: '9px 4px',
-                  borderRadius: 9,
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: active ? palette.dark : palette.bg,
-                  color: active ? palette.offwhite : palette.muted,
-                }}
-              >
-                {opt.label}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ ...fieldLabelStyle(palette), marginBottom: 0 }}>Status color theme</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {COLOR_MODE_OPTIONS.map((opt) => {
-            const active = colorMode === opt.id;
-            return (
-              <div
-                key={opt.id}
-                onClick={() => onSelectColorMode(opt.id)}
-                style={{
-                  flex: 1,
-                  textAlign: 'center',
-                  padding: '9px 4px',
-                  borderRadius: 9,
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: active ? palette.dark : palette.bg,
-                  color: active ? palette.offwhite : palette.muted,
-                }}
-              >
-                {opt.label}
-              </div>
-            );
-          })}
+        <div
+          onClick={accountSaving ? undefined : handleSaveAccount}
+          style={{
+            textAlign: 'center',
+            padding: '12px 0',
+            borderRadius: 12,
+            background: palette.dark,
+            color: palette.offwhite,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: accountSaving ? 'default' : 'pointer',
+            opacity: accountSaving ? 0.6 : 1,
+          }}
+        >
+          {accountSaving ? 'Saving…' : 'Save account changes'}
         </div>
       </div>
 

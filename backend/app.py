@@ -22,6 +22,7 @@ from .models import (
     SetCropRequest,
     SignupRequest,
     SyncFieldRequest,
+    UpdateAccountRequest,
     UpdateFieldRequest,
     UserOut,
 )
@@ -249,3 +250,19 @@ def login(payload: LoginRequest):
     users_collection.update_one({"_id": user["_id"]}, {"$set": {"sessionToken": token}})
     user["sessionToken"] = token
     return serialize_user(user)
+
+
+@app.patch("/account", response_model=UserOut)
+def update_account(payload: UpdateAccountRequest, current_user: dict = Depends(get_current_user)):
+    updates: dict = {}
+    if payload.username is not None:
+        updates["username"] = payload.username.strip()
+    if payload.password is not None:
+        updates["passwordHash"] = bcrypt.hashpw(payload.password.encode("utf-8"), bcrypt.gensalt())
+    if not updates:
+        return serialize_user(current_user)
+    try:
+        users_collection.update_one({"_id": current_user["_id"]}, {"$set": updates})
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="That username is already taken.")
+    return serialize_user(users_collection.find_one({"_id": current_user["_id"]}))
