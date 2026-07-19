@@ -10,6 +10,8 @@ import {
 } from '../lib/cropMetrics';
 import { predictRecommendationsBatch } from '../lib/api';
 import { subplotToPredictPayload } from '../lib/mlPredict';
+import { resolveCropSuggestion } from '../lib/cropSuggestions';
+import CropSuggestionPanel from '../components/fields/CropSuggestionPanel';
 
 interface RecommendationScreenProps {
   palette: Palette;
@@ -178,6 +180,17 @@ function SubplotRecommendationCard({
           </div>
         </div>
       </div>
+
+      {!unknown && advice.shouldRotate && (
+        <CropSuggestionPanel
+          palette={palette}
+          suggestion={resolveCropSuggestion(
+            subplot.data.cropEntries,
+            subplot.data.recommendations,
+            { shouldRotate: true },
+          )}
+        />
+      )}
     </article>
   );
 }

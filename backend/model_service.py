@@ -133,6 +133,78 @@ def _normalize_subplot_dict(subplot: dict) -> dict:
     }
 
 
+def _enrich_with_crop_suggestions(result: dict[str, Any], normalized: dict) -> dict[str, Any]:
+    """Attach NPK deficiency + suggested restorative crops (heuristic)."""
+    history = list(normalized.get("crop_history") or [])
+    next_crop = normalized.get("next_crop")
+    crops = [*history]
+    if next_crop:
+        crops.append(str(next_crop).strip().lower())
+
+    # Demand scores: high demand depletes remaining nutrient → treat as deficiency signal
+    from .crop_reference import CROP_REFERENCE, DEMAND_SCORE
+
+    totals = {"N": 0.0, "P": 0.0, "K": 0.0}
+    counted = 0
+    for name in crops:
+        info = CROP_REFERENCE.get(name)
+        if not info:
+            continue
+        totals["N"] += DEMAND_SCORE.get(info["nitrogen_demand"], 2)
+        totals["P"] += DEMAND_SCORE.get(info["phosphorus_demand"], 2)
+        totals["K"] += DEMAND_SCORE.get(info["potassium_demand"], 2)
+        counted += 1
+
+    npk_deficiency = None
+    suggested: list[str] = []
+    reason = None
+    should_rotate = result.get("rotation_recommendation") == 1
+
+    if counted > 0:
+        avgs = {k: totals[k] / counted for k in totals}
+        # Highest average demand → most depleted remaining nutrient
+        worst = max(avgs, key=lambda k: avgs[k])
+        if avgs[worst] >= 2.2 or should_rotate:
+            npk_deficiency = worst
+
+    restorative = {
+        "N": ["soybean", "beans", "peas", "clover"],
+        "P": ["beans", "peas", "lettuce", "wheat"],
+        "K": ["beans", "peas", "lettuce", "clover"],
+    }
+    if npk_deficiency:
+        current = set(crops)
+        suggested = [c.title() for c in restorative[npk_deficiency] if c not in current][:3]
+        names = {"N": "Nitrogen", "P": "Phosphorus", "K": "Potassium"}
+        nutrient = names[npk_deficiency]
+        if npk_deficiency == "N":
+            reason = (
+                f"Low {nutrient} detected. Legumes help fix nitrogen in the soil, "
+                "improving fertility for the next season."
+            )
+        elif npk_deficiency == "P":
+            reason = (
+                f"Low {nutrient} detected. Lighter-feeding crops and legumes reduce further "
+                "phosphorus draw while soil recovers."
+            )
+        else:
+            reason = (
+                f"Low {nutrient} detected. Lower-potassium-demand crops give the soil time "
+                "to rebuild K reserves."
+            )
+    elif should_rotate:
+        suggested = ["Soybean", "Clover", "Peas"]
+        reason = (
+            "Soil nutrients look relatively balanced; legumes still help maintain fertility "
+            "if you rotate."
+        )
+
+    result["npk_deficiency"] = npk_deficiency
+    result["suggested_crops"] = suggested
+    result["suggestion_reason"] = reason
+    return result
+
+
 def _input_fingerprint(normalized: dict) -> str:
     payload = {
         "soil_type": str(normalized.get("soil_type") or "").lower(),
@@ -237,6 +309,7 @@ class RecommendationModelService:
             "rotation_label": "Rotate Crops" if rotation_pred == 1 else "Do Not Rotate",
             "soil_exhaustion_score": round(exhaustion_score, 4),
         }
+        result = _enrich_with_crop_suggestions(result, normalized)
         self._cache[fp] = result
         # Bound cache size
         if len(self._cache) > 2048:
@@ -303,6 +376,7 @@ class RecommendationModelService:
                 "rotation_label": "Rotate Crops" if pred == 1 else "Do Not Rotate",
                 "soil_exhaustion_score": round(float(exh[j]), 4),
             }
+            result = _enrich_with_crop_suggestions(result, to_score_norm[j])
             fp = _input_fingerprint(to_score_norm[j])
             self._cache[fp] = result
             results[i] = result

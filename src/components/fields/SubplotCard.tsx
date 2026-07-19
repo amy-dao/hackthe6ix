@@ -1,7 +1,6 @@
-import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { Palette } from '../../palette';
 import type { LngLat, Subplot } from '../../types';
-import EllipsisMenu from './EllipsisMenu';
 import SubplotMiniMap from './SubplotMiniMap';
 
 interface SubplotCardProps {
@@ -107,31 +106,18 @@ export default function SubplotCard({
         style={{
           flex: 1,
           minWidth: 0,
-          padding: '12px 12px 12px 14px',
+          padding: '12px 14px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
           gap: 4,
-          position: 'relative',
         }}
       >
-        <div
-          style={{ position: 'absolute', top: 6, right: 6 }}
-          onClick={(e: MouseEvent) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <EllipsisMenu
-            palette={palette}
-            items={[{ label: 'Edit' }, { label: 'Predict' }]}
-          />
-        </div>
-
         <div
           style={{
             fontSize: 14,
             fontWeight: 700,
             color: palette.dark,
-            paddingRight: 36,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',

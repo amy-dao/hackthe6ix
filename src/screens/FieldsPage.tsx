@@ -5,13 +5,15 @@ import ViewToggle, { type FieldsViewMode } from '../components/fields/ViewToggle
 import MainFieldMap from '../components/fields/MainFieldMap';
 import SubplotList from '../components/fields/SubplotList';
 import SubplotDetailPanel from '../components/fields/SubplotDetailPanel';
+import YearlyWeatherChart from '../components/fields/YearlyWeatherChart';
+import { farmLocationFromGeometry } from '../lib/farmLocation';
+import { fetchMonthlyClimate, type MonthlyClimate } from '../lib/weather';
 
 interface FieldsPageProps {
   palette: Palette;
   farm: FarmState;
   onOpenFarmMap: () => void;
   onUpdateSubplotData: (id: string, data: SubplotData) => void;
-  /** When set (e.g. from Recommend tab), open that subplot in the Subplots view. */
   focusSubplotId?: string | null;
   onFocusSubplotConsumed?: () => void;
 }
@@ -42,7 +44,49 @@ export default function FieldsPage({
 }: FieldsPageProps) {
   const [view, setView] = useState<FieldsViewMode>('main');
   const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
+  const [climate, setClimate] = useState<MonthlyClimate[] | null>(null);
+  const [climateError, setClimateError] = useState<string | null>(null);
+  const [climateLoading, setClimateLoading] = useState(false);
   const cropSummary = useMemo(() => aggregateCrops(farm), [farm]);
+
+  const location = useMemo(
+    () =>
+      farmLocationFromGeometry(
+        farm.farmPolygon,
+        farm.subplots.map((s) => s.coordinates),
+      ),
+    [farm.farmPolygon, farm.subplots],
+  );
+
+  const locationLabel = location
+    ? `${location.latitude.toFixed(2)}°, ${location.longitude.toFixed(2)}°`
+    : undefined;
+
+  useEffect(() => {
+    if (!location) {
+      setClimate(null);
+      return;
+    }
+    let cancelled = false;
+    setClimateLoading(true);
+    setClimateError(null);
+    fetchMonthlyClimate(location)
+      .then((months) => {
+        if (!cancelled) setClimate(months);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setClimate(null);
+          setClimateError(err instanceof Error ? err.message : 'Could not load climate data.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setClimateLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [location?.latitude, location?.longitude]);
 
   const selectedSubplot = useMemo(
     () => farm.subplots.find((s) => s.id === selectedSubplotId) ?? null,
@@ -123,6 +167,7 @@ export default function FieldsPage({
           flexDirection: 'column',
           gap: 14,
           animation: 'fieldsFadeIn 200ms ease',
+          overflowY: view === 'main' ? 'auto' : undefined,
         }}
       >
         {view === 'main' ? (
@@ -175,9 +220,22 @@ export default function FieldsPage({
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: palette.dark, lineHeight: 1.35 }}>{cropSummary}</div>
               </div>
+              {location && (
+                <div style={{ fontSize: 12, color: palette.muted, fontWeight: 600 }}>
+                  Farm location · {locationLabel}
+                </div>
+              )}
             </div>
 
-            <div style={{ flex: 1, minHeight: 280 }}>
+            {climateLoading && (
+              <div style={{ fontSize: 12.5, color: palette.muted, fontStyle: 'italic' }}>Loading climate normals…</div>
+            )}
+            {climateError && (
+              <div style={{ fontSize: 12.5, color: palette.rotate?.bg ?? '#C0392B' }}>{climateError}</div>
+            )}
+            {climate && <YearlyWeatherChart palette={palette} months={climate} locationLabel={locationLabel} />}
+
+            <div style={{ flex: 1, minHeight: 240 }}>
               <MainFieldMap farm={farm} height="100%" />
             </div>
 

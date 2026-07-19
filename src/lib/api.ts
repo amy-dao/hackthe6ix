@@ -142,6 +142,9 @@ export interface SubplotRecommendationsDto {
   rotation_probability?: number | null;
   rotation_label?: string | null;
   soil_exhaustion_score: number | 'Unknown';
+  npk_deficiency?: 'N' | 'P' | 'K' | null;
+  suggested_crops?: string[];
+  suggestion_reason?: string | null;
 }
 
 export interface PredictResponse {

@@ -12,9 +12,11 @@ import {
 import { predictRecommendation } from '../../lib/api';
 import { isUnknownRecommendation, subplotToPredictPayload } from '../../lib/mlPredict';
 import CropHistoryTimeline from './CropHistoryTimeline';
+import CropSuggestionPanel from './CropSuggestionPanel';
 import SubplotMiniMap from './SubplotMiniMap';
 import NutrientIndicator from './NutrientIndicator';
 import SoilExhaustionGauge from './SoilExhaustionGauge';
+import { resolveCropSuggestion } from '../../lib/cropSuggestions';
 
 interface SubplotDetailPanelProps {
   palette: Palette;
@@ -229,6 +231,16 @@ export default function SubplotDetailPanel({
           </div>
         </div>
       </div>
+
+      {status === 'ready' &&
+        (rotateLabel.includes('Rotate') && !rotateLabel.includes('Do Not')) && (
+          <CropSuggestionPanel
+            palette={palette}
+            suggestion={resolveCropSuggestion(data.cropEntries, data.recommendations, {
+              shouldRotate: true,
+            })}
+          />
+        )}
 
       <div style={{ background: palette.card, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div>

@@ -171,6 +171,9 @@ class SubplotRecommendations(BaseModel):
     soil_exhaustion_score: Union[float, Literal["Unknown"]]
     rotation_probability: Optional[float] = None
     rotation_label: Optional[str] = None
+    npk_deficiency: Optional[Literal["N", "P", "K"]] = None
+    suggested_crops: list[str] = []
+    suggestion_reason: Optional[str] = None
 
 
 UNKNOWN_RECOMMENDATIONS = SubplotRecommendations(
