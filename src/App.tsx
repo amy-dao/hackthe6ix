@@ -8,7 +8,6 @@ import type {
   FarmState,
   Field,
   InputMode,
-  LoginForm,
   LngLat,
   PlantingRecord,
   Profile,
@@ -30,7 +29,6 @@ import {
   login as loginApi,
   setAuthToken,
   setFieldCrop,
-  signup as signupApi,
   syncField as syncFieldApi,
   updateAccount as updateAccountApi,
   updateField as updateFieldApi,
@@ -38,7 +36,6 @@ import {
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import MapPopup from './components/MapPopup';
-import LoginScreen from './screens/LoginScreen';
 import IntroScreen from './screens/IntroScreen';
 import FarmMapScreen from './screens/FarmMapScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -59,6 +56,11 @@ const HEADER_MAP: Record<Exclude<Screen, 'detail' | 'intro'>, { eyebrow: string;
 
 const PH_MIN = 3.5;
 const PH_MAX = 9;
+
+// No login screen for now — every visitor auto-signs in as this shared
+// account. Remove this and restore LoginScreen to bring real sign-in back.
+const AUTO_LOGIN_USERNAME = 'person';
+const AUTO_LOGIN_PASSWORD = 'hello';
 
 const EMPTY_ADD_FIELD_FORM: AddFieldForm = {
   plotName: '',
@@ -83,10 +85,7 @@ export default function App() {
   const [introSeen, setIntroSeen] = useState(Boolean(saved?.introSeen));
   const [userName, setUserName] = useState(saved?.userName ?? '');
   const [sessionToken, setSessionToken] = useState(saved?.token ?? '');
-  const [loginForm, setLoginForm] = useState<LoginForm>({ name: saved?.userName ?? '', password: '' });
-  const [loginError, setLoginError] = useState('');
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [autoLoginError, setAutoLoginError] = useState('');
 
   const [farm, setFarm] = useState<FarmState>(saved?.farm ?? EMPTY_FARM);
   const [drawMode, setDrawMode] = useState<DrawMode>('idle');
@@ -124,6 +123,32 @@ export default function App() {
   const [recommendation, setRecommendation] = useState<CropRotationRecommendation | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authed) return;
+    let cancelled = false;
+    loginApi(AUTO_LOGIN_USERNAME, AUTO_LOGIN_PASSWORD)
+      .then((user) => {
+        if (cancelled) return;
+        setAuthToken(user.token);
+        setUserName(user.username);
+        setSessionToken(user.token);
+        setAuthed(true);
+        if (!introSeen) {
+          setScreen('intro');
+        } else {
+          setScreen(farm.farmPolygon ? 'dashboard' : 'farmMap');
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setAutoLoginError(err instanceof Error ? err.message : 'Failed to sign in.');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed]);
 
   useEffect(() => {
     if (!authed) return;
@@ -220,40 +245,6 @@ export default function App() {
         : { eyebrow: 'Field Intelligence', title: 'Field' }
       : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
 
-  async function signIn() {
-    const username = loginForm.name.trim();
-    const password = loginForm.password;
-    if (!username || !password) {
-      setLoginError('Enter a username and password to continue.');
-      return;
-    }
-    setAuthSubmitting(true);
-    setLoginError('');
-    try {
-      const user = authMode === 'login' ? await loginApi(username, password) : await signupApi(username, password);
-      setAuthToken(user.token);
-      setUserName(user.username);
-      setSessionToken(user.token);
-      setProfile((p) => ({ ...p, name: user.username }));
-      setAuthed(true);
-      setFields([]);
-      if (!introSeen) {
-        setScreen('intro');
-      } else {
-        setScreen(farm.farmPolygon ? 'dashboard' : 'farmMap');
-      }
-    } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Failed to sign in.');
-    } finally {
-      setAuthSubmitting(false);
-    }
-  }
-
-  function selectAuthMode(nextMode: 'login' | 'signup') {
-    setAuthMode(nextMode);
-    setLoginError('');
-  }
-
   async function updateAccount(updates: { username?: string; password?: string }) {
     setAccountSaving(true);
     setAccountError('');
@@ -272,8 +263,7 @@ export default function App() {
   function signOut() {
     setAuthToken(null);
     setAuthed(false);
-    setLoginForm({ name: '', password: '' });
-    setLoginError('');
+    setAutoLoginError('');
     setUserName('');
     setSessionToken('');
     setIntroSeen(false);
@@ -594,17 +584,24 @@ export default function App() {
         }}
       >
         {!authed ? (
-          <LoginScreen
-            palette={palette}
-            loginForm={loginForm}
-            loginError={loginError}
-            mode={authMode}
-            submitting={authSubmitting}
-            onChangeName={(name) => setLoginForm((s) => ({ ...s, name }))}
-            onChangePassword={(password) => setLoginForm((s) => ({ ...s, password }))}
-            onSignIn={signIn}
-            onSelectMode={selectAuthMode}
-          />
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            {autoLoginError ? (
+              <div style={{ color: palette.rotate.bg, fontSize: 13.5, fontWeight: 600 }}>{autoLoginError}</div>
+            ) : (
+              <div style={{ color: palette.muted, fontSize: 13.5 }}>Loading…</div>
+            )}
+          </div>
         ) : screen === 'intro' ? (
           <IntroScreen palette={palette} userName={userName} onContinue={finishIntro} />
         ) : (
