@@ -200,11 +200,25 @@ export default function App() {
 
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flagged, setFlagged] = useState(false);
   const [textQuery, setTextQuery] = useState('');
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [identifying, setIdentifying] = useState(false);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (screen !== 'camera') {
+      setInputMode('photo');
+      setCaptured(false);
+      setCapturedImage(null);
+      setFlagged(false);
+      setTextQuery('');
+      setScanResult(null);
+      setIdentifyError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   const [profile, setProfile] = useState<Profile>({
     name: saved?.userName || 'Jordan Hale',
@@ -532,13 +546,14 @@ export default function App() {
 
   function buildScanResult(result: ApiIdentifyResult): ScanResult {
     return {
+      isPlant: result.isPlant,
       species: result.species,
       isWeed: result.isWeed,
-      tagLabel: result.isWeed ? 'Weed' : 'Crop',
+      actionTier: result.actionTier,
+      tagLabel: result.isPlant ? (result.isWeed ? 'Weed' : 'Crop') : null,
       tagBg: result.isWeed ? palette.rotate.bg : palette.safe.bg,
       tagText: result.isWeed ? palette.rotate.text : palette.safe.text,
       reason: result.reason,
-      confidence: result.confidence,
     };
   }
 
@@ -557,6 +572,7 @@ export default function App() {
   }
 
   function handleCapture(imageBase64: string) {
+    setCapturedImage(imageBase64);
     runIdentify({ imageBase64 });
   }
 
@@ -727,16 +743,20 @@ export default function App() {
                   onSetPhotoMode={() => {
                     setInputMode('photo');
                     setCaptured(false);
+                    setCapturedImage(null);
                     setTextQuery('');
                   }}
                   onSetTextMode={() => {
                     setInputMode('text');
                     setCaptured(false);
+                    setCapturedImage(null);
                   }}
                   captured={captured}
+                  capturedImage={capturedImage}
                   onCapture={handleCapture}
                   onRetake={() => {
                     setCaptured(false);
+                    setCapturedImage(null);
                     setFlagged(false);
                     setTextQuery('');
                     setScanResult(null);

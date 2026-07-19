@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Palette } from '../palette';
+import type { ActionTier } from '../lib/api';
 import type { InputMode } from '../types';
 import { fieldLabelStyle } from '../lib/formStyles';
 
 export interface ScanResult {
-  species: string;
-  isWeed: boolean;
-  tagLabel: string;
+  isPlant: boolean;
+  species: string | null;
+  isWeed: boolean | null;
+  actionTier: ActionTier | null;
+  tagLabel: string | null;
   tagBg: string;
   tagText: string;
   reason: string;
-  confidence: string;
 }
+
+const ACTION_TIER_LABELS: Record<ActionTier, string> = {
+  monitor: 'Monitor — low density, not yet worth treating',
+  spot_treat: 'Spot-treat this location',
+  broader_concern: 'Broader concern — check the surrounding area',
+};
 
 interface IdentifyScreenProps {
   palette: Palette;
@@ -19,6 +27,7 @@ interface IdentifyScreenProps {
   onSetPhotoMode: () => void;
   onSetTextMode: () => void;
   captured: boolean;
+  capturedImage: string | null;
   onCapture: (imageBase64: string) => void;
   onRetake: () => void;
   textQuery: string;
@@ -37,6 +46,7 @@ export default function IdentifyScreen({
   onSetPhotoMode,
   onSetTextMode,
   captured,
+  capturedImage,
   onCapture,
   onRetake,
   textQuery,
@@ -165,8 +175,12 @@ export default function IdentifyScreen({
                 {streamError ? 'Camera unavailable — grant camera access, then tap capture' : 'Point camera at the plant, then tap capture'}
               </div>
             )}
-            {captured && (
-              <div style={{ width: '70%', aspectRatio: '1', borderRadius: '50%', background: 'rgba(95,168,211,0.18)', border: `2px solid ${palette.accent}` }} />
+            {captured && capturedImage && (
+              <img
+                src={capturedImage}
+                alt="Captured plant"
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             )}
           </div>
 
@@ -246,37 +260,48 @@ export default function IdentifyScreen({
       {captured && !identifying && !identifyError && scanResult && (
         <>
           <div style={{ background: palette.card, borderRadius: 16, padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={fieldLabelStyle(palette)}>Identified</div>
-                <div style={{ fontSize: 19, fontWeight: 800, color: palette.dark }}>{scanResult.species}</div>
+            {scanResult.isPlant ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={fieldLabelStyle(palette)}>Identified</div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: palette.dark }}>{scanResult.species}</div>
+                </div>
+                {scanResult.tagLabel && (
+                  <div style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 20, background: scanResult.tagBg, color: scanResult.tagText }}>
+                    {scanResult.tagLabel}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 20, background: scanResult.tagBg, color: scanResult.tagText }}>
-                {scanResult.tagLabel}
-              </div>
-            </div>
+            ) : (
+              <div style={fieldLabelStyle(palette)}>Not a plant</div>
+            )}
+
             <div style={{ marginTop: 10, fontSize: 13.5, color: palette.dark, lineHeight: 1.5 }}>{scanResult.reason}</div>
-            <div style={{ marginTop: 8, fontSize: 12, color: palette.muted }}>
-              Confidence <span style={{ fontWeight: 700, color: palette.dark }}>{scanResult.confidence}</span>
-            </div>
 
             {scanResult.isWeed && (
-              <div
-                onClick={onToggleFlag}
-                style={{
-                  marginTop: 12,
-                  textAlign: 'center',
-                  padding: '12px 0',
-                  borderRadius: 12,
-                  background: flagged ? palette.safe.bg : palette.dark,
-                  color: flagged ? palette.safe.text : palette.offwhite,
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                }}
-              >
-                {flagged ? 'Flagged as weed ✓' : 'Flag weed'}
-              </div>
+              <>
+                {scanResult.actionTier && (
+                  <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 700, color: palette.dark }}>
+                    Recommended action: {ACTION_TIER_LABELS[scanResult.actionTier]}
+                  </div>
+                )}
+                <div
+                  onClick={onToggleFlag}
+                  style={{
+                    marginTop: 12,
+                    textAlign: 'center',
+                    padding: '12px 0',
+                    borderRadius: 12,
+                    background: flagged ? palette.safe.bg : palette.dark,
+                    color: flagged ? palette.safe.text : palette.offwhite,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {flagged ? 'Flagged as weed ✓' : 'Flag weed'}
+                </div>
+              </>
             )}
           </div>
           <div onClick={onRetake} style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: palette.accent, cursor: 'pointer' }}>

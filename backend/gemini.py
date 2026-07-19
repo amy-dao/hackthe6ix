@@ -19,10 +19,21 @@ MODEL = "gemini-flash-latest"
 
 PROMPT = (
     "You are an expert agronomist helping a row-crop farmer identify a plant found in "
-    "their field. Identify the plant species. Decide whether it is a weed (an undesirable "
-    "plant competing with the crop) as opposed to the crop itself or another desirable "
-    "plant. Give a short, plain-language reason (1-2 sentences) a farmer would understand, "
-    "and a confidence percentage formatted like '87%'."
+    "their field.\n\n"
+    "First, check whether the image actually shows a plant. If it shows a person, an "
+    "animal, a man-made object, or anything that is not a plant, do not attempt a "
+    "species identification — instead say so plainly, e.g. \"This doesn't look like a "
+    "plant — try a clearer photo of the leaves or stem.\"\n\n"
+    "If it IS a plant, identify the species as specifically as you can (common name is "
+    "fine). Decide whether it is a weed (an undesirable plant competing with the crop) "
+    "as opposed to the crop itself or another desirable plant.\n\n"
+    "If it is a weed, recommend one action tier based on what you can see in the photo: "
+    "\"monitor\" (isolated/low density, not yet worth treating), \"spot_treat\" (treat "
+    "this specific location only), or \"broader_concern\" (species known to spread "
+    "aggressively or resist control, worth checking the surrounding area). Prefer the "
+    "least intervention that's reasonable — the goal is to help farmers avoid "
+    "unnecessary blanket herbicide application.\n\n"
+    "Give a short, plain-language reason (1-2 sentences) a farmer would understand."
 )
 
 RECOMMENDATION_PROMPT = (
