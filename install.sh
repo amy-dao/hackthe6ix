@@ -6,7 +6,15 @@ echo "==> Installing frontend dependencies (npm)"
 npm install
 
 echo "==> Setting up Python virtual environment (.venv) for the backend"
-python3 -m venv .venv
+PY_VERSION="$(cat .python-version)"
+if command -v "python${PY_VERSION}" >/dev/null 2>&1; then
+  PYTHON_BIN="python${PY_VERSION}"
+else
+  echo "==> WARNING: python${PY_VERSION} not found on PATH; falling back to python3 ($(python3 --version 2>&1))."
+  echo "    Install Python ${PY_VERSION} for a known-good environment, e.g.: brew install python@${PY_VERSION}"
+  PYTHON_BIN="python3"
+fi
+"$PYTHON_BIN" -m venv .venv
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r backend/requirements.txt
 

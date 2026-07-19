@@ -21,13 +21,16 @@ can reach it, not just yours.)
 
 ### 1. Install everything
 
-Requires: Node.js `20.19+` or `22.12+`, npm, and Python `3.10+`.
+Requires: Node.js `20.19+` or `22.12+`, npm, and Python `3.12` (the
+project is pinned to `3.12` via `.python-version` — newer versions like
+3.14 can hit missing/broken native wheels for packages such as
+`pydantic-core`). On macOS: `brew install python@3.12`.
 
 ```bash
 ./install.sh
 ```
 
-(Windows without WSL/Git Bash: `npm install`, `python -m venv .venv`,
+(Windows without WSL/Git Bash: `npm install`, `py -3.12 -m venv .venv`,
 `.venv\Scripts\activate`, `pip install -r backend/requirements.txt`,
 `copy backend\.env.example backend\.env`.)
 
