@@ -13,6 +13,8 @@ export default function IntroScreen({ palette, userName, onContinue }: IntroScre
     <div
       style={{
         flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',

@@ -567,28 +567,30 @@ export default function App() {
     runIdentify({ description: textQuery.trim() });
   }
 
-  const shellMaxWidth = screen === 'farmMap' ? 720 : 480;
+  const shellMaxWidth = 480;
 
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         display: 'flex',
         justifyContent: 'center',
         background: '#E7E4DA',
         fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
         boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       <div
         style={{
           width: '100%',
           maxWidth: shellMaxWidth,
-          minHeight: '100dvh',
+          height: '100dvh',
           background: palette.bg,
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
+          overflow: 'hidden',
         }}
       >
         {!authed ? (

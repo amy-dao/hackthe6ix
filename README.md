@@ -31,6 +31,12 @@ Requires: Node.js `20.19+` or `22.12+`, npm, and Python `3.10+`.
 `.venv\Scripts\activate`, `pip install -r backend/requirements.txt`,
 `copy backend\.env.example backend\.env`.)
 
+Already set this up before? Re-run `./install.sh` (or at least
+`pip install -r backend/requirements.txt`) after every `git pull` —
+new backend dependencies get added from time to time, and a missing
+one makes the backend crash on startup, which shows up as "Failed to
+fetch" on every screen, starting with sign-in.
+
 ### 2. Add the secrets
 
 Open `backend/.env` and paste in the two values from step 0.
@@ -73,7 +79,8 @@ same Wi-Fi/LAN (or Tailscale):
 
 ## Features / screens
 
-- **Sign in** — mock auth gate (any non-empty email/password)
+- **Sign in / create account** — real accounts (bcrypt-hashed
+  passwords, stored in MongoDB); each account only sees its own fields
 - **Fields dashboard** — card grid and birdseye map view of all fields,
   with search, status filters, and bulk-edit mode
 - **Field detail** — Field (name/acreage), Crop (rotation
@@ -82,7 +89,7 @@ same Wi-Fi/LAN (or Tailscale):
 - **Identify** — camera or text description of a plant, sent to Gemini
   for weed/crop identification with a confidence score
 - **Add crop** — log a new planting against an existing or new plot
-- **Profile** — farmer/farm info, equipment, units, theme toggle
+- **Profile** — farmer/farm info, plus username/password changes
 
 All of the above persists to MongoDB through the backend.
 
