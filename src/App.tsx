@@ -41,13 +41,13 @@ import AddFieldScreen from './screens/AddFieldScreen';
 import RecommendationScreen from './screens/CropRecommendationScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
-const HEADER_MAP: Record<Screen, { eyebrow: string; title: string }> = {
-  dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
-  camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
-  recommendation: { eyebrow: 'Field Intelligence', title: 'Recommendation' },
-  profile: { eyebrow: 'Field Intelligence', title: 'Profile' },
-  addField: { eyebrow: 'Field Intelligence', title: 'Add Field' },
-  farmMap: { eyebrow: 'Field Intelligence', title: 'Farm Map' },
+const HEADER_MAP: Record<Screen, { title: string }> = {
+  dashboard: { title: 'Your Fields' },
+  camera: { title: 'Identify' },
+  recommendation: { title: 'Recommendation' },
+  profile: { title: 'Profile' },
+  addField: { title: 'Add Field' },
+  farmMap: { title: 'Farm Map' },
 };
 
 const PH_MIN = 3.5;
@@ -101,7 +101,7 @@ export default function App() {
   }, [drawMode]);
 
   const [screen, setScreen] = useState<Screen>('dashboard');
-  const [fields, setFields] = useState<Field[]>([]);
+  const [, setFields] = useState<Field[]>([]);
 
   const [addForm, setAddForm] = useState<AddFieldForm>(EMPTY_ADD_FIELD_FORM);
   const [addFieldSaving, setAddFieldSaving] = useState(false);
@@ -269,7 +269,6 @@ export default function App() {
 
   const showBack = screen === 'addField' || (screen === 'camera' && captured);
   const header = HEADER_MAP[screen];
-
   async function updateAccount(updates: {
     username?: string;
     password?: string;
@@ -555,7 +554,7 @@ export default function App() {
     runIdentify({ description: textQuery.trim() });
   }
 
-  const shellMaxWidth = 760;
+  const shellMaxWidth = 1200;
 
   return (
     <div
@@ -602,7 +601,7 @@ export default function App() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%' }}>
-            <Header palette={palette} eyebrow={header.eyebrow} title={header.title} showBack={showBack} onBack={back} />
+            <Header palette={palette} title={header.title} showBack={showBack} onBack={back} />
 
             <div
               style={{

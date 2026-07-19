@@ -264,14 +264,6 @@ export default function FieldsPage({
               )}
             </div>
 
-            {climateLoading && (
-              <div style={{ fontSize: 12.5, color: palette.muted, fontStyle: 'italic' }}>Loading climate normals…</div>
-            )}
-            {climateError && (
-              <div style={{ fontSize: 12.5, color: palette.rotate?.bg ?? '#C0392B' }}>{climateError}</div>
-            )}
-            {climate && <YearlyWeatherChart palette={palette} months={climate} locationLabel={locationLabel} />}
-
             <button
               type="button"
               onClick={onOpenFarmMap}
@@ -290,6 +282,14 @@ export default function FieldsPage({
             >
               Edit farm map
             </button>
+
+            {climateLoading && (
+              <div style={{ fontSize: 12.5, color: palette.muted, fontStyle: 'italic' }}>Loading climate normals…</div>
+            )}
+            {climateError && (
+              <div style={{ fontSize: 12.5, color: palette.rotate?.bg ?? '#C0392B' }}>{climateError}</div>
+            )}
+            {climate && <YearlyWeatherChart palette={palette} months={climate} locationLabel={locationLabel} />}
           </>
         ) : selectedSubplot ? (
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginRight: -4, paddingRight: 4 }}>
