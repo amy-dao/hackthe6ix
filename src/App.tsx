@@ -27,6 +27,7 @@ import {
   identify as identifyApi,
   type IdentifyResult as ApiIdentifyResult,
   setFieldCrop,
+  syncField as syncFieldApi,
   updateField as updateFieldApi,
 } from './lib/api';
 import Header from './components/Header';
@@ -82,6 +83,8 @@ export default function App() {
   const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
   const [draftAreaAcres, setDraftAreaAcres] = useState(0);
   const [drawError, setDrawError] = useState<string | null>(null);
+  const [syncingSubplotId, setSyncingSubplotId] = useState<string | null>(null);
+  const [subplotSyncError, setSubplotSyncError] = useState<string | null>(null);
 
   const [screen, setScreen] = useState<Screen>(
     saved?.userName ? (saved.introSeen ? (saved.farm.farmPolygon ? 'dashboard' : 'farmMap') : 'intro') : 'dashboard',
@@ -170,7 +173,7 @@ export default function App() {
     name: saved?.userName || 'Jordan Hale',
     farmName: 'Hale Family Farm',
     location: 'Cedar County, IA',
-    acres: String(saved?.farm.farmAreaAcres || '183'),
+    acres: saved ? String(saved.farm.farmAreaAcres) : '183',
     crops: 'Corn, Soybeans, Wheat',
     equipment: 'handheld',
     units: 'acres',
@@ -188,7 +191,7 @@ export default function App() {
   }, [fields, searchQuery, statusFilter]);
 
   const rotateNowCount = fields.filter((f) => f.status === 'rotate').length;
-  const selectedField = fields.find((f) => f.id === selectedFieldId) ?? fields[0];
+  const selectedField = fields.find((f) => f.id === selectedFieldId);
   const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
 
   const activeTab = (
@@ -202,7 +205,9 @@ export default function App() {
   const showBack = screen === 'detail' || screen === 'addField' || (screen === 'camera' && captured);
   const header =
     screen === 'detail'
-      ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} ac`, title: selectedField.name }
+      ? selectedField
+        ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} ac`, title: selectedField.name }
+        : { eyebrow: 'Field Intelligence', title: 'Field' }
       : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
 
   function signIn() {
@@ -263,6 +268,45 @@ export default function App() {
       ...f,
       subplots: f.subplots.map((s) => (s.id === id ? { ...s, data } : s)),
     }));
+  }
+
+  async function handleSaveSubplot(id: string) {
+    const subplot = farm.subplots.find((s) => s.id === id);
+    if (!subplot || !subplot.data.name.trim()) return;
+
+    setSyncingSubplotId(id);
+    setSubplotSyncError(null);
+    try {
+      const synced = await syncFieldApi({
+        name: subplot.data.name.trim(),
+        acres: subplot.areaAcres,
+        soilPh: subplot.data.soilPh === '' ? undefined : subplot.data.soilPh,
+        soilType: subplot.data.soilType || undefined,
+        cropEntries: subplot.data.cropEntries,
+      });
+      setFields((fs) => {
+        const idx = fs.findIndex((f) => f.id === synced.id);
+        if (idx >= 0) {
+          const next = [...fs];
+          next[idx] = synced;
+          return next;
+        }
+        return [...fs, synced];
+      });
+      setFarm((f) => ({
+        ...f,
+        subplots: f.subplots.map((s) => (s.id === id ? { ...s, data: { ...s.data, linkedFieldId: synced.id } } : s)),
+      }));
+    } catch (err) {
+      setSubplotSyncError(err instanceof Error ? err.message : 'Failed to save field.');
+    } finally {
+      setSyncingSubplotId(null);
+    }
+  }
+
+  function viewFieldFromSubplot(fieldId: string) {
+    setScreen('detail');
+    setSelectedFieldId(fieldId);
   }
 
   function handleDeleteSubplot(id: string) {
@@ -521,15 +565,21 @@ export default function App() {
                   selectedSubplotId={selectedSubplotId}
                   draftAreaAcres={draftAreaAcres}
                   drawError={drawError}
+                  cropOptions={referenceCrops}
+                  soilTypeOptions={referenceSoilTypes}
+                  syncingSubplotId={syncingSubplotId}
+                  syncError={subplotSyncError}
                   onSetDrawMode={setDrawMode}
                   onFarmComplete={handleFarmComplete}
                   onSubplotComplete={handleSubplotComplete}
                   onSelectSubplot={setSelectedSubplotId}
                   onUpdateSubplotData={handleUpdateSubplotData}
+                  onSaveSubplot={handleSaveSubplot}
                   onDeleteSubplot={handleDeleteSubplot}
                   onClearFarm={handleClearFarm}
                   onDraftAreaChange={setDraftAreaAcres}
                   onDrawError={setDrawError}
+                  onViewField={viewFieldFromSubplot}
                   onDone={() => setScreen('dashboard')}
                 />
               )}

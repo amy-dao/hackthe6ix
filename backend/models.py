@@ -53,6 +53,17 @@ class AddFieldRequest(BaseModel):
     cropEntries: list[CropEntry] = []
 
 
+class SyncFieldRequest(BaseModel):
+    """Farm-map subplot data being saved as a field — same shape as
+    AddFieldRequest, matched to an existing field by name or created if new."""
+
+    name: str
+    acres: float
+    soilPh: Optional[float] = Field(default=None, ge=3.5, le=9)
+    soilType: Optional[SoilType] = None
+    cropEntries: list[CropEntry] = []
+
+
 class SetCropRequest(BaseModel):
     """Change what's planted on an existing field — just the crop name,
     everything else (rotation status, history logging) is derived server-side."""

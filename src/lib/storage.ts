@@ -8,11 +8,26 @@ export const EMPTY_FARM: FarmState = {
   subplots: [],
 };
 
+function isValidSession(value: unknown): value is PersistedSession {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.userName !== 'string' || typeof v.introSeen !== 'boolean') return false;
+  const farm = v.farm as Record<string, unknown> | undefined;
+  return (
+    !!farm &&
+    typeof farm === 'object' &&
+    (farm.farmPolygon === null || Array.isArray(farm.farmPolygon)) &&
+    typeof farm.farmAreaAcres === 'number' &&
+    Array.isArray(farm.subplots)
+  );
+}
+
 export function loadSession(): PersistedSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as PersistedSession;
+    const parsed: unknown = JSON.parse(raw);
+    return isValidSession(parsed) ? parsed : null;
   } catch {
     return null;
   }

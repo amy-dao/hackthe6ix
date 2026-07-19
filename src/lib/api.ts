@@ -38,6 +38,16 @@ export function addField(payload: {
   return request<Field>('/fields', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export function syncField(payload: {
+  name: string;
+  acres: number;
+  soilPh?: number;
+  soilType?: string;
+  cropEntries: CropEntryForm[];
+}): Promise<Field> {
+  return request<Field>('/fields/sync', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export function updateField(
   id: string,
   payload: { name?: string; acres?: number | string; soilPh?: number; soilType?: string },

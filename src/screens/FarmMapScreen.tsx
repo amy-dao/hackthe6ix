@@ -11,15 +11,21 @@ interface FarmMapScreenProps {
   selectedSubplotId: string | null;
   draftAreaAcres: number;
   drawError: string | null;
+  cropOptions: string[];
+  soilTypeOptions: string[];
+  syncingSubplotId: string | null;
+  syncError: string | null;
   onSetDrawMode: (mode: DrawMode) => void;
   onFarmComplete: (coords: LngLat[], acres: number) => void;
   onSubplotComplete: (subplot: Subplot) => void;
   onSelectSubplot: (id: string | null) => void;
   onUpdateSubplotData: (id: string, data: SubplotData) => void;
+  onSaveSubplot: (id: string) => void;
   onDeleteSubplot: (id: string) => void;
   onClearFarm: () => void;
   onDraftAreaChange: (acres: number) => void;
   onDrawError: (message: string | null) => void;
+  onViewField: (fieldId: string) => void;
   onDone: () => void;
 }
 
@@ -62,15 +68,21 @@ export default function FarmMapScreen({
   selectedSubplotId,
   draftAreaAcres,
   drawError,
+  cropOptions,
+  soilTypeOptions,
+  syncingSubplotId,
+  syncError,
   onSetDrawMode,
   onFarmComplete,
   onSubplotComplete,
   onSelectSubplot,
   onUpdateSubplotData,
+  onSaveSubplot,
   onDeleteSubplot,
   onClearFarm,
   onDraftAreaChange,
   onDrawError,
+  onViewField,
   onDone,
 }: FarmMapScreenProps) {
   const selected = farm.subplots.find((s) => s.id === selectedSubplotId) ?? null;
@@ -85,9 +97,9 @@ export default function FarmMapScreen({
   const liveLabel = drawing
     ? drawMode === 'farm'
       ? 'Farm (drawing)'
-      : 'Subplot (drawing)'
+      : 'Field (drawing)'
     : selected
-      ? selected.data.name || 'Subplot'
+      ? selected.data.name || 'Field'
       : farm.farmPolygon
         ? 'Farm total'
         : 'Area';
@@ -116,7 +128,7 @@ export default function FarmMapScreen({
           />
           <ToolButton
             palette={palette}
-            label="Draw subplot"
+            label="Draw field"
             active={drawMode === 'subplot'}
             disabled={!farm.farmPolygon}
             onClick={() => {
@@ -173,7 +185,7 @@ export default function FarmMapScreen({
               </>
             ) : farm.farmPolygon ? (
               <>
-                {farm.subplots.length} subplot{farm.subplots.length === 1 ? '' : 's'}
+                {farm.subplots.length} field{farm.subplots.length === 1 ? '' : 's'}
                 <br />
                 Tap a plot to edit data
               </>
@@ -255,7 +267,7 @@ export default function FarmMapScreen({
               }}
             >
               <span style={{ width: 10, height: 10, borderRadius: 3, background: sp.color }} />
-              {sp.data.name || 'Subplot'} · {sp.areaAcres.toFixed(1)} ac
+              {sp.data.name || 'Field'} · {sp.areaAcres.toFixed(1)} ac
             </button>
           ))}
         </div>
@@ -268,9 +280,15 @@ export default function FarmMapScreen({
             data={selected.data}
             areaAcres={selected.areaAcres}
             color={selected.color}
+            cropOptions={cropOptions}
+            soilTypeOptions={soilTypeOptions}
+            saving={syncingSubplotId === selected.id}
+            syncError={syncingSubplotId === selected.id ? syncError : null}
             onChange={(data) => onUpdateSubplotData(selected.id, data)}
+            onSave={() => onSaveSubplot(selected.id)}
             onDelete={() => onDeleteSubplot(selected.id)}
             onClose={() => onSelectSubplot(null)}
+            onViewField={onViewField}
           />
         </div>
       )}

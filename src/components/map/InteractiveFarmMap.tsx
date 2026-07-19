@@ -153,7 +153,7 @@ function DrawingController({
     }
 
     if (!isFullyContained(farmPolygon, coords)) {
-      onDrawError('Subplot must be fully inside the farm boundary.');
+      onDrawError('Field must be fully inside the farm boundary.');
       setDraft([]);
       setCursor(null);
       return;
@@ -161,7 +161,7 @@ function DrawingController({
 
     for (const existing of subplots) {
       if (polygonsOverlap(existing.coordinates, coords)) {
-        onDrawError('Subplots cannot overlap each other.');
+        onDrawError('Fields cannot overlap each other.');
         setDraft([]);
         setCursor(null);
         return;
@@ -174,7 +174,7 @@ function DrawingController({
       coordinates: coords,
       areaAcres: acres,
       color: nextSubplotColor(subplots.length),
-      data: emptySubplotData(`Subplot ${subplots.length + 1}`),
+      data: emptySubplotData(`Field ${subplots.length + 1}`),
     };
     onSubplotComplete(subplot);
     setDraft([]);
@@ -200,13 +200,17 @@ export default function InteractiveFarmMap({
   const [cursor, setCursor] = useState<LngLat | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  // Clear draft when leaving draw modes
-  useEffect(() => {
+  // Clear the in-progress draft when drawMode changes away from a drawing
+  // mode. Adjusted during render (not in an effect) per React's guidance for
+  // reacting to prop changes — avoids an extra cascading render.
+  const [prevDrawMode, setPrevDrawMode] = useState(drawMode);
+  if (drawMode !== prevDrawMode) {
+    setPrevDrawMode(drawMode);
     if (drawMode !== 'farm' && drawMode !== 'subplot') {
       setDraft([]);
       setCursor(null);
     }
-  }, [drawMode]);
+  }
 
   const center = useMemo(() => {
     if (farm.farmPolygon?.length) return polygonCenter(farm.farmPolygon);

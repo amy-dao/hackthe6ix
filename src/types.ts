@@ -46,16 +46,17 @@ export type StatusFilter = 'all' | FieldStatus;
 
 export type DrawMode = 'idle' | 'farm' | 'subplot' | 'edit';
 
-export type SoilTexture = 'sandy' | 'sandy-loam' | 'loam' | 'silt-loam' | 'clay-loam' | 'clay' | 'silty-clay';
-
 /** GeoJSON-style [longitude, latitude] */
 export type LngLat = [number, number];
 
 export interface SubplotData {
   soilPh: number | '';
-  soilTexture: SoilTexture | '';
-  previousCrops: string;
+  /** One of the backend's SOIL_TYPES (clay/loam/sandy/silt) — fetched via /reference. */
+  soilType: string;
+  cropEntries: CropEntryForm[];
   name: string;
+  /** Set once this subplot has been saved as a real Field (matched or created by name). */
+  linkedFieldId?: string;
 }
 
 export interface Subplot {

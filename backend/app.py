@@ -1,3 +1,5 @@
+import re
+
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import FastAPI, HTTPException
@@ -14,6 +16,7 @@ from .models import (
     IdentifyResult,
     ReferenceOut,
     SetCropRequest,
+    SyncFieldRequest,
     UpdateFieldRequest,
 )
 
@@ -82,6 +85,42 @@ def get_field(field_id: str):
     return serialize_field(get_field_or_404(field_id))
 
 
+def field_fields_from_entries(name, acres, soil_ph, soil_type, crop_entries: list) -> dict:
+    """Build the full set of field document fields (name/acres/soil + derived
+    crop/status/history) from a plot-name plus a list of crop-history entries.
+    Shared by field creation (Add Field) and subplot-sync (farm map), which
+    both start from the same raw shape: at most one 'currently planted' crop
+    entry, plus zero or more past-planting entries.
+    """
+    current_entries = [e for e in crop_entries if e.isCurrent]
+    if len(current_entries) > 1:
+        raise HTTPException(status_code=400, detail="Only one crop can be marked as currently planted.")
+
+    past_entries = sorted((e for e in crop_entries if not e.isCurrent), key=lambda e: e.month)
+    history = [
+        {"crop": require_known_crop(e.crop), "period": f"Planted {format_month_label(e.month)}", "note": None}
+        for e in reversed(past_entries)
+    ]
+
+    base = {"name": name, "acres": acres, "soilPh": soil_ph, "soilType": soil_type}
+
+    if current_entries:
+        current = current_entries[0]
+        crop_name = require_known_crop(current.crop)
+        return {
+            **base,
+            "crop": crop_name,
+            "lastScan": format_month_label(current.month),
+            "history": history,
+            **derive_planting_status(crop_name, history),
+        }
+    return {**base, **EMPTY_FIELD_DEFAULTS, "history": history}
+
+
+def find_field_by_name(name: str):
+    return fields_collection.find_one({"name": {"$regex": f"^{re.escape(name.strip())}$", "$options": "i"}})
+
+
 @app.post("/fields", response_model=FieldOut, status_code=201)
 def add_field(payload: AddFieldRequest):
     """Create a new field: its info (size/soil), plus an optional crop-history
@@ -89,37 +128,22 @@ def add_field(payload: AddFieldRequest):
     logged as history. Whether a rotation recommendation is possible depends
     on whether any history was provided alongside the current crop.
     """
-    current_entries = [e for e in payload.cropEntries if e.isCurrent]
-    if len(current_entries) > 1:
-        raise HTTPException(status_code=400, detail="Only one crop can be marked as currently planted.")
-
-    past_entries = sorted((e for e in payload.cropEntries if not e.isCurrent), key=lambda e: e.month)
-    history = [
-        {"crop": require_known_crop(e.crop), "period": f"Planted {format_month_label(e.month)}", "note": None}
-        for e in reversed(past_entries)
-    ]
-
-    base = {
-        "name": payload.name,
-        "acres": payload.acres,
-        "soilPh": payload.soilPh,
-        "soilType": payload.soilType,
-    }
-
-    if current_entries:
-        current = current_entries[0]
-        crop_name = require_known_crop(current.crop)
-        doc = {
-            **base,
-            "crop": crop_name,
-            "lastScan": format_month_label(current.month),
-            "history": history,
-            **derive_planting_status(crop_name, history),
-        }
-    else:
-        doc = {**base, **EMPTY_FIELD_DEFAULTS, "history": history}
-
+    doc = field_fields_from_entries(payload.name, payload.acres, payload.soilPh, payload.soilType, payload.cropEntries)
     result = fields_collection.insert_one(doc)
+    return serialize_field(fields_collection.find_one({"_id": result.inserted_id}))
+
+
+@app.post("/fields/sync", response_model=FieldOut)
+def sync_field(payload: SyncFieldRequest):
+    """Find-or-create by plot name — used when a farm-map subplot's info is
+    saved. A subplot with the same name as an existing field updates that
+    field in place; otherwise a new field is created automatically."""
+    fields = field_fields_from_entries(payload.name, payload.acres, payload.soilPh, payload.soilType, payload.cropEntries)
+    existing = find_field_by_name(payload.name)
+    if existing:
+        fields_collection.update_one({"_id": existing["_id"]}, {"$set": fields})
+        return serialize_field(fields_collection.find_one({"_id": existing["_id"]}))
+    result = fields_collection.insert_one(fields)
     return serialize_field(fields_collection.find_one({"_id": result.inserted_id}))
 
 
