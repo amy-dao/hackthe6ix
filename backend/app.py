@@ -25,6 +25,9 @@ app = FastAPI(title="Field Intelligence API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    # Also allow the dev servers when reached over LAN/Tailscale (teammates
+    # hitting your machine's IP instead of localhost) on the same two ports.
+    allow_origin_regex=r"http://(\d{1,3}\.){3}\d{1,3}:(3000|5173)",
     allow_methods=["*"],
     allow_headers=["*"],
 )

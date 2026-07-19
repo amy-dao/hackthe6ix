@@ -1,6 +1,7 @@
 import type { CropEntryForm, Field } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+const API_BASE_URL =
+  (import.meta.env.VITE_API_URL as string | undefined) ?? `http://${window.location.hostname}:8000`;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {

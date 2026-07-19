@@ -110,6 +110,26 @@ close that other thing, or run the backend on a different port:
 `uvicorn backend.app:app --reload --port 8001` — but then also set
 `VITE_API_URL=http://localhost:8001` when you run `npm run dev`.
 
+**Teammates get "Failed to fetch" when they open your dev server**
+By default both dev servers only listen on `localhost`, which only
+your own machine can reach. To let teammates on the same network (or
+Tailscale) load the app from your machine:
+
+1. Start the backend with `--host 0.0.0.0` so it accepts connections
+   from other machines:
+   ```bash
+   uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
+   ```
+2. `npm run dev` already listens on all interfaces — it'll print a
+   `Network:` URL (e.g. `http://100.x.x.x:3000`) alongside the
+   `Local:` one. Share that `Network` URL, not the `localhost` one.
+3. Find your machine's IP if you need it directly: `ipconfig getifaddr en0`
+   (macOS Wi-Fi) or `ifconfig` / `ipconfig` more generally.
+
+Teammates should open the `Network` URL in their own browser — the
+app automatically points its API calls at whatever host they loaded
+the page from, so no extra config is needed on their end.
+
 **`ModuleNotFoundError` or `command not found: uvicorn` / `'uvicorn' is not recognized`**
 You forgot to activate the virtual environment first — run
 `source .venv/bin/activate` (macOS/Linux) or `.venv\Scripts\activate`
