@@ -10,6 +10,7 @@ import type {
   InputMode,
   LoginForm,
   LngLat,
+  PlantingRecord,
   Profile,
   Screen,
   StatusFilter,
@@ -473,6 +474,18 @@ export default function App() {
     }
   }
 
+  function addHistoryRecord(record: PlantingRecord) {
+    setFields((fs) =>
+      fs.map((f) => (f.id === selectedFieldId ? { ...f, history: [record, ...f.history] } : f)),
+    );
+    // TODO: also persist this to the backend, e.g.
+    // fetch('http://localhost:8000/api/history', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ fieldId: selectedFieldId, ...record }),
+    // });
+  }
+
   function buildScanResult(result: ApiIdentifyResult): ScanResult {
     return {
       species: result.species,
@@ -646,6 +659,7 @@ export default function App() {
                   onDismiss={() => setActionMessage('Recommendation dismissed.')}
                   onSaveField={saveFieldEdits}
                   onDeleteField={deleteSelectedField}
+                  onAddHistoryRecord={addHistoryRecord}
                 />
               )}
 

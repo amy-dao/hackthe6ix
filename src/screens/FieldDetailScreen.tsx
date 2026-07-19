@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import type { Palette } from '../palette';
-import type { Field } from '../types';
+import type { Field, HistoryTrackingForm, PlantingRecord } from '../types';
 import { statusMeta, cropIcon, titleCase } from '../lib/fieldHelpers';
 import { fieldLabelStyle, fieldInputStyle } from '../lib/formStyles';
 
 const PH_MIN = 3.5;
 const PH_MAX = 9;
+
+const EMPTY_HISTORY_FORM: HistoryTrackingForm = {
+  cropName: '',
+  datePlanted: '',
+  harvestDate: '',
+  yieldAmount: '',
+  fertilizerUsed: '',
+  pesticidesApplied: '',
+};
 
 interface FieldDraft {
   name: string;
@@ -41,6 +50,7 @@ interface FieldDetailScreenProps {
   onDismiss: () => void;
   onSaveField: (updates: { name: string; acres: number; soilPh?: number; soilType: string }) => void;
   onDeleteField: () => void;
+  onAddHistoryRecord: (record: PlantingRecord) => void;
 }
 
 type DetailTab = 'field' | 'crop' | 'history';
@@ -53,6 +63,11 @@ const TABS: { id: DetailTab; label: string }[] = [
 
 function selectStyle(palette: Palette) {
   return { ...fieldInputStyle(palette), appearance: 'auto' as const, cursor: 'pointer' };
+}
+
+function buildPeriodLabel(datePlanted: string, harvestDate: string): string {
+  if (datePlanted && harvestDate) return `${datePlanted} – ${harvestDate}`;
+  return datePlanted || harvestDate || 'Date unknown';
 }
 
 export default function FieldDetailScreen({
@@ -71,11 +86,15 @@ export default function FieldDetailScreen({
   onDismiss,
   onSaveField,
   onDeleteField,
+  onAddHistoryRecord,
 }: FieldDetailScreenProps) {
   const [tab, setTab] = useState<DetailTab>('crop');
   const [confirmingClearCrop, setConfirmingClearCrop] = useState(false);
   const [confirmingDeleteField, setConfirmingDeleteField] = useState(false);
   const [draft, setDraft] = useState<FieldDraft>(() => draftFromField(field));
+
+  const [loggingHistory, setLoggingHistory] = useState(false);
+  const [historyForm, setHistoryForm] = useState<HistoryTrackingForm>(EMPTY_HISTORY_FORM);
 
   const meta = statusMeta(field.status, palette);
   const hasRecommendation = field.status === 'safe' || field.status === 'marginal' || field.status === 'rotate';
@@ -96,6 +115,8 @@ export default function FieldDetailScreen({
   const phValid = draft.soilPhUnknown || (draft.soilPh.trim() !== '' && Number.isFinite(phValue) && phValue >= PH_MIN && phValue <= PH_MAX);
   const canSaveField = draft.name.trim().length > 0 && draft.soilType.trim().length > 0 && acresValid && phValid;
 
+  const canSaveHistory = historyForm.cropName.trim().length > 0 && historyForm.datePlanted.trim().length > 0;
+
   function saveField() {
     if (!dirty || !canSaveField) return;
     onSaveField({
@@ -104,6 +125,25 @@ export default function FieldDetailScreen({
       soilPh: draft.soilPhUnknown ? undefined : phValue,
       soilType: draft.soilType,
     });
+  }
+
+  function saveHistoryRecord() {
+    if (!canSaveHistory) return;
+    onAddHistoryRecord({
+      crop: historyForm.cropName.trim(),
+      period: buildPeriodLabel(historyForm.datePlanted.trim(), historyForm.harvestDate.trim()),
+      harvestDate: historyForm.harvestDate.trim() || undefined,
+      yieldAmount: historyForm.yieldAmount.trim() || undefined,
+      fertilizerUsed: historyForm.fertilizerUsed.trim() || undefined,
+      pesticidesApplied: historyForm.pesticidesApplied.trim() || undefined,
+    });
+    setHistoryForm(EMPTY_HISTORY_FORM);
+    setLoggingHistory(false);
+  }
+
+  function cancelHistoryRecord() {
+    setHistoryForm(EMPTY_HISTORY_FORM);
+    setLoggingHistory(false);
   }
 
   return (
@@ -442,6 +482,121 @@ export default function FieldDetailScreen({
             </div>
           )}
 
+          {!loggingHistory ? (
+            <div
+              onClick={() => setLoggingHistory(true)}
+              style={{
+                textAlign: 'center',
+                padding: '13px 0',
+                borderRadius: 12,
+                background: palette.dark,
+                color: palette.offwhite,
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              + Log a planting record
+            </div>
+          ) : (
+            <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={fieldLabelStyle(palette)}>Crop</div>
+                <input
+                  value={historyForm.cropName}
+                  onChange={(e) => setHistoryForm((f) => ({ ...f, cropName: e.target.value }))}
+                  list="fieldHistoryCrops"
+                  placeholder="e.g. Corn, Soybeans"
+                  style={fieldInputStyle(palette)}
+                />
+                <datalist id="fieldHistoryCrops">
+                  {cropOptions.map((c) => (
+                    <option key={c} value={titleCase(c)} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <div style={fieldLabelStyle(palette)}>Date planted</div>
+                <input
+                  type="date"
+                  value={historyForm.datePlanted}
+                  onChange={(e) => setHistoryForm((f) => ({ ...f, datePlanted: e.target.value }))}
+                  style={fieldInputStyle(palette)}
+                />
+              </div>
+              <div>
+                <div style={fieldLabelStyle(palette)}>Harvest date</div>
+                <input
+                  type="date"
+                  value={historyForm.harvestDate}
+                  onChange={(e) => setHistoryForm((f) => ({ ...f, harvestDate: e.target.value }))}
+                  style={fieldInputStyle(palette)}
+                />
+              </div>
+              <div>
+                <div style={fieldLabelStyle(palette)}>Yield</div>
+                <input
+                  value={historyForm.yieldAmount}
+                  onChange={(e) => setHistoryForm((f) => ({ ...f, yieldAmount: e.target.value }))}
+                  placeholder="e.g. 180 bu/acre"
+                  style={fieldInputStyle(palette)}
+                />
+              </div>
+              <div>
+                <div style={fieldLabelStyle(palette)}>Fertilizer used</div>
+                <input
+                  value={historyForm.fertilizerUsed}
+                  onChange={(e) => setHistoryForm((f) => ({ ...f, fertilizerUsed: e.target.value }))}
+                  placeholder="e.g. Urea 46-0-0"
+                  style={fieldInputStyle(palette)}
+                />
+              </div>
+              <div>
+                <div style={fieldLabelStyle(palette)}>Pesticides applied</div>
+                <input
+                  value={historyForm.pesticidesApplied}
+                  onChange={(e) => setHistoryForm((f) => ({ ...f, pesticidesApplied: e.target.value }))}
+                  placeholder="e.g. Glyphosate"
+                  style={fieldInputStyle(palette)}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div
+                  onClick={saveHistoryRecord}
+                  style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    padding: '12px 0',
+                    borderRadius: 10,
+                    background: palette.dark,
+                    color: palette.offwhite,
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    cursor: canSaveHistory ? 'pointer' : 'default',
+                    opacity: canSaveHistory ? 1 : 0.45,
+                  }}
+                >
+                  Save record
+                </div>
+                <div
+                  onClick={cancelHistoryRecord}
+                  style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    padding: '12px 0',
+                    borderRadius: 10,
+                    color: palette.muted,
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{ background: palette.card, borderRadius: 16, padding: '14px 16px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: palette.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
               Past plantings
@@ -461,6 +616,15 @@ export default function FieldDetailScreen({
                         {record.period}
                         {record.note ? ` · ${record.note}` : ''}
                       </div>
+                      {(record.yieldAmount || record.fertilizerUsed || record.pesticidesApplied) && (
+                        <div style={{ fontSize: 11.5, color: palette.muted, marginTop: 2, lineHeight: 1.4 }}>
+                          {record.yieldAmount && <>Yield: {record.yieldAmount}</>}
+                          {record.yieldAmount && (record.fertilizerUsed || record.pesticidesApplied) ? ' · ' : ''}
+                          {record.fertilizerUsed && <>Fertilizer: {record.fertilizerUsed}</>}
+                          {record.fertilizerUsed && record.pesticidesApplied ? ' · ' : ''}
+                          {record.pesticidesApplied && <>Pesticides: {record.pesticidesApplied}</>}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
