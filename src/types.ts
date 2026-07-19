@@ -6,6 +6,7 @@ export interface PlantingRecord {
   crop: string;
   period: string;
   note?: string;
+  datePlanted?: string;
   harvestDate?: string;
   yieldAmount?: string;
   fertilizerUsed?: string;

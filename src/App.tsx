@@ -520,16 +520,24 @@ export default function App() {
     }
   }
 
+  async function saveHistoryRecords(nextHistory: PlantingRecord[]) {
+    try {
+      applyFieldUpdate(await updateFieldApi(selectedFieldId, { history: nextHistory }));
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : 'Failed to save planting history.');
+    }
+  }
+
   function addHistoryRecord(record: PlantingRecord) {
-    setFields((fs) =>
-      fs.map((f) => (f.id === selectedFieldId ? { ...f, history: [record, ...f.history] } : f)),
-    );
-    // TODO: also persist this to the backend, e.g.
-    // fetch('http://localhost:8000/api/history', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ fieldId: selectedFieldId, ...record }),
-    // });
+    const field = fields.find((f) => f.id === selectedFieldId);
+    if (!field) return;
+    void saveHistoryRecords([record, ...field.history]);
+  }
+
+  function editHistoryRecord(index: number, record: PlantingRecord) {
+    const field = fields.find((f) => f.id === selectedFieldId);
+    if (!field) return;
+    void saveHistoryRecords(field.history.map((r, i) => (i === index ? record : r)));
   }
 
   function buildScanResult(result: ApiIdentifyResult): ScanResult {
@@ -711,6 +719,7 @@ export default function App() {
                   onSaveField={saveFieldEdits}
                   onDeleteField={deleteSelectedField}
                   onAddHistoryRecord={addHistoryRecord}
+                  onEditHistoryRecord={editHistoryRecord}
                 />
               )}
 

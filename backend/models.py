@@ -17,6 +17,11 @@ class PlantingRecord(BaseModel):
     crop: str
     period: str
     note: Optional[str] = None
+    datePlanted: Optional[str] = None
+    harvestDate: Optional[str] = None
+    yieldAmount: Optional[str] = None
+    fertilizerUsed: Optional[str] = None
+    pesticidesApplied: Optional[str] = None
 
 
 class FieldOut(BaseModel):
@@ -76,6 +81,7 @@ class UpdateFieldRequest(BaseModel):
     acres: Optional[Union[float, str]] = None
     soilPh: Optional[float] = Field(default=None, ge=3.5, le=9)
     soilType: Optional[SoilType] = None
+    history: Optional[list[PlantingRecord]] = None
 
 
 class ReferenceOut(BaseModel):

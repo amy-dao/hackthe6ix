@@ -180,6 +180,8 @@ def sync_field(payload: SyncFieldRequest, current_user: dict = Depends(get_curre
 def update_field(field_id: str, payload: UpdateFieldRequest, current_user: dict = Depends(get_current_user)):
     existing = get_field_or_404(field_id, str(current_user["_id"]))
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
+    if "history" in updates and existing.get("status") != "empty":
+        updates.update(derive_planting_status(existing["crop"], updates["history"]))
     if updates:
         fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
         existing = fields_collection.find_one({"_id": existing["_id"]})

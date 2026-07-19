@@ -51,6 +51,7 @@ interface FieldDetailScreenProps {
   onSaveField: (updates: { name: string; acres: number; soilPh?: number; soilType: string }) => void;
   onDeleteField: () => void;
   onAddHistoryRecord: (record: PlantingRecord) => void;
+  onEditHistoryRecord: (index: number, record: PlantingRecord) => void;
 }
 
 type DetailTab = 'field' | 'crop' | 'history';
@@ -70,6 +71,10 @@ function buildPeriodLabel(datePlanted: string, harvestDate: string): string {
   return datePlanted || harvestDate || 'Date unknown';
 }
 
+function isManualHistoryRecord(record: PlantingRecord): boolean {
+  return Boolean(record.datePlanted);
+}
+
 export default function FieldDetailScreen({
   palette,
   field,
@@ -87,13 +92,15 @@ export default function FieldDetailScreen({
   onSaveField,
   onDeleteField,
   onAddHistoryRecord,
+  onEditHistoryRecord,
 }: FieldDetailScreenProps) {
   const [tab, setTab] = useState<DetailTab>('crop');
   const [confirmingClearCrop, setConfirmingClearCrop] = useState(false);
   const [confirmingDeleteField, setConfirmingDeleteField] = useState(false);
   const [draft, setDraft] = useState<FieldDraft>(() => draftFromField(field));
 
-  const [loggingHistory, setLoggingHistory] = useState(false);
+  const [historyFormOpen, setHistoryFormOpen] = useState(false);
+  const [editingHistoryIndex, setEditingHistoryIndex] = useState<number | null>(null);
   const [historyForm, setHistoryForm] = useState<HistoryTrackingForm>(EMPTY_HISTORY_FORM);
 
   const meta = statusMeta(field.status, palette);
@@ -127,23 +134,50 @@ export default function FieldDetailScreen({
     });
   }
 
+  function openAddHistoryForm() {
+    setHistoryForm(EMPTY_HISTORY_FORM);
+    setEditingHistoryIndex(null);
+    setHistoryFormOpen(true);
+  }
+
+  function openEditHistoryForm(index: number, record: PlantingRecord) {
+    setHistoryForm({
+      cropName: record.crop,
+      datePlanted: record.datePlanted ?? '',
+      harvestDate: record.harvestDate ?? '',
+      yieldAmount: record.yieldAmount ?? '',
+      fertilizerUsed: record.fertilizerUsed ?? '',
+      pesticidesApplied: record.pesticidesApplied ?? '',
+    });
+    setEditingHistoryIndex(index);
+    setHistoryFormOpen(true);
+  }
+
   function saveHistoryRecord() {
     if (!canSaveHistory) return;
-    onAddHistoryRecord({
+    const record: PlantingRecord = {
       crop: historyForm.cropName.trim(),
       period: buildPeriodLabel(historyForm.datePlanted.trim(), historyForm.harvestDate.trim()),
+      datePlanted: historyForm.datePlanted.trim() || undefined,
       harvestDate: historyForm.harvestDate.trim() || undefined,
       yieldAmount: historyForm.yieldAmount.trim() || undefined,
       fertilizerUsed: historyForm.fertilizerUsed.trim() || undefined,
       pesticidesApplied: historyForm.pesticidesApplied.trim() || undefined,
-    });
+    };
+    if (editingHistoryIndex !== null) {
+      onEditHistoryRecord(editingHistoryIndex, record);
+    } else {
+      onAddHistoryRecord(record);
+    }
     setHistoryForm(EMPTY_HISTORY_FORM);
-    setLoggingHistory(false);
+    setHistoryFormOpen(false);
+    setEditingHistoryIndex(null);
   }
 
   function cancelHistoryRecord() {
     setHistoryForm(EMPTY_HISTORY_FORM);
-    setLoggingHistory(false);
+    setHistoryFormOpen(false);
+    setEditingHistoryIndex(null);
   }
 
   return (
@@ -482,9 +516,9 @@ export default function FieldDetailScreen({
             </div>
           )}
 
-          {!loggingHistory ? (
+          {!historyFormOpen ? (
             <div
-              onClick={() => setLoggingHistory(true)}
+              onClick={openAddHistoryForm}
               style={{
                 textAlign: 'center',
                 padding: '13px 0',
@@ -500,6 +534,9 @@ export default function FieldDetailScreen({
             </div>
           ) : (
             <div style={{ background: palette.card, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={fieldLabelStyle(palette)}>
+                {editingHistoryIndex !== null ? 'Edit planting record' : 'New planting record'}
+              </div>
               <div>
                 <div style={fieldLabelStyle(palette)}>Crop</div>
                 <input
@@ -576,7 +613,7 @@ export default function FieldDetailScreen({
                     opacity: canSaveHistory ? 1 : 0.45,
                   }}
                 >
-                  Save record
+                  Save {editingHistoryIndex !== null ? 'changes' : 'record'}
                 </div>
                 <div
                   onClick={cancelHistoryRecord}
@@ -608,7 +645,10 @@ export default function FieldDetailScreen({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {field.history.map((record, i) => (
-                  <div key={`${record.crop}-${record.period}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: palette.bg, borderRadius: 10 }}>
+                  <div
+                    key={`${record.crop}-${record.period}-${i}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: palette.bg, borderRadius: 10 }}
+                  >
                     <span style={{ fontSize: 18 }}>{cropIcon(record.crop)}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: palette.dark }}>{record.crop}</div>
@@ -626,6 +666,14 @@ export default function FieldDetailScreen({
                         </div>
                       )}
                     </div>
+                    {isManualHistoryRecord(record) && (
+                      <div
+                        onClick={() => openEditHistoryForm(i, record)}
+                        style={{ fontSize: 12, fontWeight: 700, color: palette.accent, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+                      >
+                        Edit
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

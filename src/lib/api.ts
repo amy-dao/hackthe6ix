@@ -74,7 +74,7 @@ export function syncField(payload: {
 
 export function updateField(
   id: string,
-  payload: { name?: string; acres?: number | string; soilPh?: number; soilType?: string },
+  payload: { name?: string; acres?: number | string; soilPh?: number; soilType?: string; history?: Field['history'] },
 ): Promise<Field> {
   return request<Field>(`/fields/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
