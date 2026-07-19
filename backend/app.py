@@ -10,7 +10,7 @@ from pymongo.errors import DuplicateKeyError
 
 from .crop_reference import CROP_REFERENCE, SOIL_TYPES
 from .db import fields_collection, users_collection
-from .gemini import identify_plant
+from .gemini import identify_plant, recommend_rotations
 from .logic import derive_planting_status, empty_field_set, format_month_label, planted_field_set
 from .models import (
     AddFieldRequest,
