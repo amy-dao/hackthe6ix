@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   AddFieldForm,
   ColorMode,
-  CropRotationRecommendation,
-  DashboardView,
+  CropEntryForm,
   DrawMode,
+  EditTarget,
   FarmState,
   Field,
   InputMode,
@@ -12,7 +12,6 @@ import type {
   PlantingRecord,
   Profile,
   Screen,
-  StatusFilter,
   Subplot,
   SubplotData,
 } from './types';
@@ -35,10 +34,9 @@ import {
 } from './lib/api';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
-import MapPopup from './components/MapPopup';
 import IntroScreen from './screens/IntroScreen';
 import FarmMapScreen from './screens/FarmMapScreen';
-import DashboardScreen from './screens/DashboardScreen';
+import FieldsPage from './screens/FieldsPage';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
 import AddFieldScreen from './screens/AddFieldScreen';
@@ -89,29 +87,24 @@ export default function App() {
 
   const [farm, setFarm] = useState<FarmState>(saved?.farm ?? EMPTY_FARM);
   const [drawMode, setDrawMode] = useState<DrawMode>('idle');
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
   const [draftAreaAcres, setDraftAreaAcres] = useState(0);
   const [drawError, setDrawError] = useState<string | null>(null);
   const [syncingSubplotId, setSyncingSubplotId] = useState<string | null>(null);
   const [subplotSyncError, setSubplotSyncError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (drawMode !== 'edit') setEditTarget(null);
+  }, [drawMode]);
+
   const [screen, setScreen] = useState<Screen>(
     saved?.userName ? (saved.introSeen ? (saved.farm.farmPolygon ? 'dashboard' : 'farmMap') : 'intro') : 'dashboard',
   );
   const [selectedFieldId, setSelectedFieldId] = useState('');
   const [fields, setFields] = useState<Field[]>([]);
-  const [fieldsLoading, setFieldsLoading] = useState(true);
-  const [fieldsError, setFieldsError] = useState<string | null>(null);
-
-  const [editMode, setEditMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingCrop, setEditingCrop] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | false>(false);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [dashboardView, setDashboardView] = useState<DashboardView>('cards');
-  const [mapPopupFieldId, setMapPopupFieldId] = useState<string | null>(null);
 
   const [addForm, setAddForm] = useState<AddFieldForm>(EMPTY_ADD_FIELD_FORM);
   const [addFieldSaving, setAddFieldSaving] = useState(false);
@@ -119,10 +112,7 @@ export default function App() {
 
   const [referenceCrops, setReferenceCrops] = useState<string[]>([]);
   const [referenceSoilTypes, setReferenceSoilTypes] = useState<string[]>([]);
-
-  const [recommendation, setRecommendation] = useState<CropRotationRecommendation | null>(null);
-  const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [focusSubplotId, setFocusSubplotId] = useState<string | null>(null);
 
   useEffect(() => {
     if (authed) return;
@@ -153,17 +143,13 @@ export default function App() {
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
-    setFieldsLoading(true);
     fetchFields()
       .then((data) => {
         if (cancelled) return;
         setFields(data);
-        setFieldsLoading(false);
       })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setFieldsError(err instanceof Error ? err.message : 'Failed to load fields.');
-        setFieldsLoading(false);
+      .catch(() => {
+        /* Fields tab uses local farm geometry; API fields still hydrate for detail views when available. */
       });
     return () => {
       cancelled = true;
@@ -184,27 +170,34 @@ export default function App() {
         setReferenceSoilTypes(data.soilTypes);
       })
       .catch(() => {
-        /* dropdowns render empty; Save stays disabled until a crop/soil type is picked */
+        /* Local CROP_REFERENCE / SOIL_TYPES fill dropdowns when the API is offline. */
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    if (screen === 'recommendation' && !recommendation && !recommendationLoading) {
-      fetchRecommendation();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen]);
-
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flagged, setFlagged] = useState(false);
   const [textQuery, setTextQuery] = useState('');
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [identifying, setIdentifying] = useState(false);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (screen !== 'camera') {
+      setInputMode('photo');
+      setCaptured(false);
+      setCapturedImage(null);
+      setFlagged(false);
+      setTextQuery('');
+      setScanResult(null);
+      setIdentifyError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   const [profile, setProfile] = useState<Profile>({
     name: saved?.userName || 'Jordan Hale',
@@ -216,18 +209,7 @@ export default function App() {
 
   const palette = palettes[colorMode];
 
-  const visibleFields = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return fields.filter(
-      (f) =>
-        (statusFilter === 'all' || f.status === statusFilter) &&
-        (!q || f.name.toLowerCase().includes(q) || f.crop.toLowerCase().includes(q)),
-    );
-  }, [fields, searchQuery, statusFilter]);
-
-  const rotateNowCount = fields.filter((f) => f.status === 'rotate').length;
   const selectedField = fields.find((f) => f.id === selectedFieldId);
-  const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
 
   const activeTab = (
     screen === 'detail' || screen === 'addField'
@@ -241,7 +223,7 @@ export default function App() {
   const header =
     screen === 'detail'
       ? selectedField
-        ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} ac`, title: selectedField.name }
+        ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} acres`, title: selectedField.name }
         : { eyebrow: 'Field Intelligence', title: 'Field' }
       : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
 
@@ -271,8 +253,6 @@ export default function App() {
     setDrawMode('idle');
     setSelectedSubplotId(null);
     setFields([]);
-    setFieldsLoading(true);
-    setFieldsError(null);
     setAccountError('');
     clearSession();
   }
@@ -300,6 +280,35 @@ export default function App() {
     setDraftAreaAcres(0);
   }
 
+  function startEditFarmBoundary() {
+    setSelectedSubplotId(null);
+    setDrawError(null);
+    setEditTarget({ type: 'farm' });
+    setDrawMode('edit');
+  }
+
+  function startEditSubplot(id: string) {
+    setDrawError(null);
+    setEditTarget({ type: 'subplot', id });
+    setDrawMode('edit');
+  }
+
+  function finishEditing() {
+    setDrawMode('idle');
+    setEditTarget(null);
+  }
+
+  function handleEditFarmBoundary(coords: LngLat[], acres: number) {
+    setFarm((f) => ({ ...f, farmPolygon: coords, farmAreaAcres: acres }));
+  }
+
+  function handleEditSubplotShape(id: string, coords: LngLat[], areaAcres: number) {
+    setFarm((f) => ({
+      ...f,
+      subplots: f.subplots.map((s) => (s.id === id ? { ...s, coordinates: coords, areaAcres } : s)),
+    }));
+  }
+
   function handleUpdateSubplotData(id: string, data: SubplotData) {
     setFarm((f) => ({
       ...f,
@@ -319,7 +328,12 @@ export default function App() {
         acres: subplot.areaAcres,
         soilPh: subplot.data.soilPh === '' ? undefined : subplot.data.soilPh,
         soilType: subplot.data.soilType || undefined,
-        cropEntries: subplot.data.cropEntries,
+        cropEntries: subplot.data.cropEntries.map((e) => ({
+          ...e,
+          month: e.month || (e.startDate ? e.startDate.slice(0, 7) : ''),
+          startDate: e.startDate || '',
+          endDate: e.endDate || '',
+        })),
       });
       setFields((fs) => {
         const idx = fs.findIndex((f) => f.id === synced.id);
@@ -359,57 +373,39 @@ export default function App() {
     setDraftAreaAcres(0);
   }
 
-  function selectField(id: string) {
-    if (editMode) {
-      toggleSelect(id);
-      return;
-    }
-    setScreen('detail');
-    setSelectedFieldId(id);
-    setActionMessage(false);
-    setEditingCrop(false);
-  }
-
   function back() {
     setScreen('dashboard');
     setActionMessage(false);
     setEditingCrop(false);
   }
 
-  function toggleSelect(id: string) {
-    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
   function applyFieldUpdate(updated: Field) {
     setFields((fs) => fs.map((f) => (f.id === updated.id ? updated : f)));
   }
 
-  async function clearSelected() {
-    if (!selectedIds.length) return;
-    const ids = selectedIds;
-    setSelectedIds([]);
-    try {
-      await Promise.all(ids.map((id) => deleteFieldApi(id)));
-      setFields((fs) => fs.filter((f) => !ids.includes(f.id)));
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to delete selected fields.');
-    }
-  }
-
   function onAddCropEntry() {
-    setAddForm((s) => ({ ...s, cropEntries: [...s.cropEntries, { crop: '', month: '', isCurrent: false }] }));
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: [...s.cropEntries, { crop: '', month: '', startDate: '', endDate: '', isCurrent: false }],
+    }));
   }
 
   function onRemoveCropEntry(index: number) {
     setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.filter((_, i) => i !== index) }));
   }
 
-  function onChangeCropEntryCrop(index: number, crop: string) {
-    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, crop } : e)) }));
+  function onChangeCropEntryCrop(index: number, crop: string, meta?: CropEntryForm['meta']) {
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, crop, meta } : e)),
+    }));
   }
 
-  function onChangeCropEntryMonth(index: number, month: string) {
-    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, month } : e)) }));
+  function onChangeCropEntryDates(index: number, dates: { startDate: string; endDate: string; month: string }) {
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, ...dates } : e)),
+    }));
   }
 
   function onSetCurrentEntry(index: number) {
@@ -425,7 +421,9 @@ export default function App() {
     const phNum = Number(soilPh);
     const acresValid = acres.trim() !== '' && Number.isFinite(acresNum) && acresNum > 0;
     const phValid = soilPhUnknown || (soilPh.trim() !== '' && Number.isFinite(phNum) && phNum >= PH_MIN && phNum <= PH_MAX);
-    const entriesValid = cropEntries.every((e) => e.crop.trim() !== '' && e.month.trim() !== '');
+    const entriesValid = cropEntries.every(
+      (e) => e.crop.trim() !== '' && (e.startDate.trim() !== '' || e.month.trim() !== ''),
+    );
     const currentCount = cropEntries.filter((e) => e.isCurrent).length;
     if (!plotName.trim() || !soilType.trim() || !acresValid || !phValid || !entriesValid || currentCount > 1) return;
 
@@ -437,7 +435,12 @@ export default function App() {
         acres: acresNum,
         soilPh: soilPhUnknown ? undefined : phNum,
         soilType,
-        cropEntries,
+        cropEntries: cropEntries.map((e) => ({
+          ...e,
+          month: e.month || (e.startDate ? e.startDate.slice(0, 7) : ''),
+          startDate: e.startDate || '',
+          endDate: e.endDate || '',
+        })),
       });
       setFields((fs) => [...fs, created]);
       setScreen('dashboard');
@@ -453,34 +456,9 @@ export default function App() {
     try {
       await deleteFieldApi(id);
       setFields((fs) => fs.filter((f) => f.id !== id));
-      setSelectedIds((ids) => ids.filter((x) => x !== id));
       back();
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : 'Failed to delete field.');
-    }
-  }
-
-  async function fetchRecommendation() {
-    setRecommendationLoading(true);
-    setRecommendationError(null);
-    try {
-      // TODO: replace with the real AI model call once the endpoint is available,
-      // e.g. const result = await getCropRotationRecommendation(selectedField?.id);
-      const result: CropRotationRecommendation = await new Promise((resolve) =>
-        setTimeout(
-          () =>
-            resolve({
-              recommendedCrop: 'Soybeans',
-              rotationDate: 'October 15, 2026',
-            }),
-          400,
-        ),
-      );
-      setRecommendation(result);
-    } catch (err) {
-      setRecommendationError(err instanceof Error ? err.message : 'Failed to load recommendation.');
-    } finally {
-      setRecommendationLoading(false);
     }
   }
 
@@ -532,13 +510,14 @@ export default function App() {
 
   function buildScanResult(result: ApiIdentifyResult): ScanResult {
     return {
+      isPlant: result.isPlant,
       species: result.species,
       isWeed: result.isWeed,
-      tagLabel: result.isWeed ? 'Weed' : 'Crop',
+      actionTier: result.actionTier,
+      tagLabel: result.isPlant ? (result.isWeed ? 'Weed' : 'Crop') : null,
       tagBg: result.isWeed ? palette.rotate.bg : palette.safe.bg,
       tagText: result.isWeed ? palette.rotate.text : palette.safe.text,
       reason: result.reason,
-      confidence: result.confidence,
     };
   }
 
@@ -557,6 +536,7 @@ export default function App() {
   }
 
   function handleCapture(imageBase64: string) {
+    setCapturedImage(imageBase64);
     runIdentify({ imageBase64 });
   }
 
@@ -565,7 +545,7 @@ export default function App() {
     runIdentify({ description: textQuery.trim() });
   }
 
-  const shellMaxWidth = 480;
+  const shellMaxWidth = 760;
 
   return (
     <div
@@ -619,7 +599,7 @@ export default function App() {
             <div
               style={{
                 flex: 1,
-                overflowY: screen === 'farmMap' ? 'hidden' : 'auto',
+                overflowY: screen === 'farmMap' || screen === 'dashboard' ? 'hidden' : 'auto',
                 padding: '16px 16px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -631,6 +611,7 @@ export default function App() {
                   palette={palette}
                   farm={farm}
                   drawMode={drawMode}
+                  editTarget={editTarget}
                   selectedSubplotId={selectedSubplotId}
                   draftAreaAcres={draftAreaAcres}
                   drawError={drawError}
@@ -650,50 +631,25 @@ export default function App() {
                   onDrawError={setDrawError}
                   onViewField={viewFieldFromSubplot}
                   onDone={() => setScreen('dashboard')}
+                  onStartEditFarmBoundary={startEditFarmBoundary}
+                  onStartEditSubplot={startEditSubplot}
+                  onFinishEditing={finishEditing}
+                  onEditFarmBoundary={handleEditFarmBoundary}
+                  onEditSubplot={handleEditSubplotShape}
                 />
               )}
 
-              {screen === 'dashboard' && fieldsLoading && (
-                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
-                  Loading fields…
-                </div>
-              )}
-
-              {screen === 'dashboard' && !fieldsLoading && fieldsError && (
-                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
-                  Couldn't load fields from the server: {fieldsError}
-                </div>
-              )}
-
-              {screen === 'dashboard' && !fieldsLoading && !fieldsError && (
-                <DashboardScreen
+              {screen === 'dashboard' && (
+                <FieldsPage
                   palette={palette}
-                  fields={visibleFields}
-                  allFieldsCount={fields.length}
-                  rotateNowCount={rotateNowCount}
-                  view={dashboardView}
-                  onSetView={setDashboardView}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  statusFilter={statusFilter}
-                  onSetStatusFilter={setStatusFilter}
-                  editMode={editMode}
-                  onToggleEditMode={() => {
-                    setEditMode((v) => !v);
-                    setSelectedIds([]);
-                  }}
-                  selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                  onClearSelected={clearSelected}
-                  onSelectField={selectField}
-                  onShowMapPopup={setMapPopupFieldId}
-                  onAddField={() => {
-                    setAddForm(EMPTY_ADD_FIELD_FORM);
-                    setAddFieldError(null);
-                    setScreen('addField');
-                  }}
-                  onOpenFarmMap={() => setScreen('farmMap')}
                   farm={farm}
+                  onUpdateSubplotData={handleUpdateSubplotData}
+                  focusSubplotId={focusSubplotId}
+                  onFocusSubplotConsumed={() => setFocusSubplotId(null)}
+                  onOpenFarmMap={() => {
+                    setDrawMode(farm.farmPolygon ? 'idle' : 'farm');
+                    setScreen('farmMap');
+                  }}
                 />
               )}
 
@@ -727,16 +683,20 @@ export default function App() {
                   onSetPhotoMode={() => {
                     setInputMode('photo');
                     setCaptured(false);
+                    setCapturedImage(null);
                     setTextQuery('');
                   }}
                   onSetTextMode={() => {
                     setInputMode('text');
                     setCaptured(false);
+                    setCapturedImage(null);
                   }}
                   captured={captured}
+                  capturedImage={capturedImage}
                   onCapture={handleCapture}
                   onRetake={() => {
                     setCaptured(false);
+                    setCapturedImage(null);
                     setFlagged(false);
                     setTextQuery('');
                     setScanResult(null);
@@ -756,10 +716,15 @@ export default function App() {
               {screen === 'recommendation' && (
                 <RecommendationScreen
                   palette={palette}
-                  recommendation={recommendation}
-                  loading={recommendationLoading}
-                  error={recommendationError}
-                  onRetry={fetchRecommendation}
+                  farm={farm}
+                  onOpenFarmMap={() => {
+                    setDrawMode(farm.farmPolygon ? 'idle' : 'farm');
+                    setScreen('farmMap');
+                  }}
+                  onOpenSubplot={(id) => {
+                    setFocusSubplotId(id);
+                    setScreen('dashboard');
+                  }}
                 />
               )}
 
@@ -781,7 +746,7 @@ export default function App() {
                   onAddCropEntry={onAddCropEntry}
                   onRemoveCropEntry={onRemoveCropEntry}
                   onChangeCropEntryCrop={onChangeCropEntryCrop}
-                  onChangeCropEntryMonth={onChangeCropEntryMonth}
+                  onChangeCropEntryDates={onChangeCropEntryDates}
                   onSetCurrentEntry={onSetCurrentEntry}
                   onSave={saveAddField}
                   onCancel={() => setScreen('dashboard')}
@@ -801,19 +766,6 @@ export default function App() {
                 />
               )}
             </div>
-
-            {mapPopupField && (
-              <MapPopup
-                palette={palette}
-                field={mapPopupField}
-                onClose={() => setMapPopupFieldId(null)}
-                onViewDetails={() => {
-                  setScreen('detail');
-                  setSelectedFieldId(mapPopupField.id);
-                  setMapPopupFieldId(null);
-                }}
-              />
-            )}
 
             <BottomNav palette={palette} activeTab={activeTab} onNavigate={setScreen} />
           </div>

@@ -21,3 +21,7 @@ export function emptySubplotData(name = ''): import('../types').SubplotData {
     cropEntries: [],
   };
 }
+
+export function emptyCropEntryForm(): import('../types').CropEntryForm {
+  return { crop: '', month: '', startDate: '', endDate: '', isCurrent: false };
+}

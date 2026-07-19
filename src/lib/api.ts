@@ -91,11 +91,14 @@ export function deleteField(id: string): Promise<void> {
   return request<void>(`/fields/${id}`, { method: 'DELETE' });
 }
 
+export type ActionTier = 'monitor' | 'spot_treat' | 'broader_concern';
+
 export interface IdentifyResult {
-  species: string;
-  isWeed: boolean;
+  isPlant: boolean;
+  species: string | null;
+  isWeed: boolean | null;
+  actionTier: ActionTier | null;
   reason: string;
-  confidence: string;
 }
 
 export function identify(payload: { imageBase64?: string; description?: string }): Promise<IdentifyResult> {

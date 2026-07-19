@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@turf/turf": "^7.3.5",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",

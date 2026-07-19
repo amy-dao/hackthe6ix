@@ -6,6 +6,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from .crop_reference import CROP_REFERENCE, SOIL_TYPES
@@ -31,10 +32,20 @@ app = FastAPI(title="Field Intelligence API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    # Vite falls back to 3001/3002/... when 3000 is already taken.
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+        "http://127.0.0.1:5173",
+    ],
     # Also allow the dev servers when reached over LAN/Tailscale (teammates
-    # hitting your machine's IP instead of localhost) on the same two ports.
-    allow_origin_regex=r"http://(\d{1,3}\.){3}\d{1,3}:(3000|5173)",
+    # hitting your machine's IP instead of localhost) on common Vite ports.
+    allow_origin_regex=r"http://(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|5173)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -141,12 +152,6 @@ def field_fields_from_entries(name, acres, soil_ph, soil_type, crop_entries: lis
     return {**base, **EMPTY_FIELD_DEFAULTS, "history": history}
 
 
-def find_field_by_name(name: str, owner_id: str):
-    return fields_collection.find_one(
-        {"name": {"$regex": f"^{re.escape(name.strip())}$", "$options": "i"}, "ownerId": owner_id}
-    )
-
-
 @app.post("/fields", response_model=FieldOut, status_code=201)
 def add_field(payload: AddFieldRequest, current_user: dict = Depends(get_current_user)):
     """Create a new field: its info (size/soil), plus an optional crop-history
@@ -157,23 +162,26 @@ def add_field(payload: AddFieldRequest, current_user: dict = Depends(get_current
     doc = field_fields_from_entries(payload.name, payload.acres, payload.soilPh, payload.soilType, payload.cropEntries)
     doc["ownerId"] = str(current_user["_id"])
     result = fields_collection.insert_one(doc)
-    return serialize_field(fields_collection.find_one({"_id": result.inserted_id}))
+    return serialize_field({**doc, "_id": result.inserted_id})
 
 
 @app.post("/fields/sync", response_model=FieldOut)
 def sync_field(payload: SyncFieldRequest, current_user: dict = Depends(get_current_user)):
     """Find-or-create by plot name — used when a farm-map subplot's info is
     saved. A subplot with the same name as an existing field (owned by this
-    account) updates that field in place; otherwise a new field is created."""
+    account) updates that field in place; otherwise a new field is created.
+    One atomic find-and-modify round trip instead of a separate find + write
+    + refetch — those were adding up to a noticeably slow save on the map."""
     owner_id = str(current_user["_id"])
     fields = field_fields_from_entries(payload.name, payload.acres, payload.soilPh, payload.soilType, payload.cropEntries)
-    existing = find_field_by_name(payload.name, owner_id)
-    if existing:
-        fields_collection.update_one({"_id": existing["_id"]}, {"$set": fields})
-        return serialize_field(fields_collection.find_one({"_id": existing["_id"]}))
     fields["ownerId"] = owner_id
-    result = fields_collection.insert_one(fields)
-    return serialize_field(fields_collection.find_one({"_id": result.inserted_id}))
+    doc = fields_collection.find_one_and_update(
+        {"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}, "ownerId": owner_id},
+        {"$set": fields},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return serialize_field(doc)
 
 
 @app.patch("/fields/{field_id}", response_model=FieldOut)
@@ -184,7 +192,7 @@ def update_field(field_id: str, payload: UpdateFieldRequest, current_user: dict 
         updates.update(derive_planting_status(existing["crop"], updates["history"]))
     if updates:
         fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
-        existing = fields_collection.find_one({"_id": existing["_id"]})
+        existing = {**existing, **updates}
     return serialize_field(existing)
 
 
@@ -196,7 +204,7 @@ def set_crop(field_id: str, payload: SetCropRequest, current_user: dict = Depend
     existing = get_field_or_404(field_id, str(current_user["_id"]))
     updates = planted_field_set(existing, require_known_crop(payload.cropName.strip()))
     fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
-    return serialize_field(fields_collection.find_one({"_id": existing["_id"]}))
+    return serialize_field({**existing, **updates})
 
 
 @app.delete("/fields/{field_id}/crop", response_model=FieldOut)
@@ -205,7 +213,7 @@ def clear_crop(field_id: str, current_user: dict = Depends(get_current_user)):
     existing = get_field_or_404(field_id, str(current_user["_id"]))
     updates = empty_field_set(existing)
     fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
-    return serialize_field(fields_collection.find_one({"_id": existing["_id"]}))
+    return serialize_field({**existing, **updates})
 
 
 @app.delete("/fields/{field_id}", status_code=204)

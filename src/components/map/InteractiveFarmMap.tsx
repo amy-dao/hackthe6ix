@@ -5,12 +5,13 @@ import {
   Polygon,
   Polyline,
   CircleMarker,
+  Marker,
   useMap,
   useMapEvents,
 } from 'react-leaflet';
 import L from 'leaflet';
 import type { Palette } from '../../palette';
-import type { DrawMode, FarmState, LngLat, Subplot } from '../../types';
+import type { DrawMode, EditTarget, FarmState, LngLat, Subplot } from '../../types';
 import {
   areaAcres,
   isFullyContained,
@@ -27,12 +28,24 @@ interface InteractiveFarmMapProps {
   palette: Palette;
   farm: FarmState;
   drawMode: DrawMode;
+  editTarget: EditTarget | null;
   selectedSubplotId: string | null;
   onFarmComplete: (coords: LngLat[], acres: number) => void;
   onSubplotComplete: (subplot: Subplot) => void;
   onSelectSubplot: (id: string | null) => void;
   onDraftAreaChange: (acres: number) => void;
   onDrawError: (message: string | null) => void;
+  onEditFarmBoundary: (coords: LngLat[], acres: number) => void;
+  onEditSubplot: (id: string, coords: LngLat[], areaAcres: number) => void;
+}
+
+function vertexIcon(fillColor: string) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:${fillColor};border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.45);"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
 }
 
 function FitBounds({ coords }: { coords: LngLat[] | null }) {
@@ -212,17 +225,39 @@ export default function InteractiveFarmMap({
   palette,
   farm,
   drawMode,
+  editTarget,
   selectedSubplotId,
   onFarmComplete,
   onSubplotComplete,
   onSelectSubplot,
   onDraftAreaChange,
   onDrawError,
+  onEditFarmBoundary,
+  onEditSubplot,
 }: InteractiveFarmMapProps) {
   const [draft, setDraft] = useState<LngLat[]>([]);
   const [cursor, setCursor] = useState<LngLat | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [searchTarget, setSearchTarget] = useState<FlyToTarget | null>(null);
+
+  const editingSubplot =
+    editTarget?.type === 'subplot' ? farm.subplots.find((s) => s.id === editTarget.id) ?? null : null;
+  const editCoords: LngLat[] | null =
+    drawMode === 'edit' && editTarget?.type === 'farm'
+      ? farm.farmPolygon
+      : drawMode === 'edit' && editingSubplot
+        ? editingSubplot.coordinates
+        : null;
+
+  function commitEditedCoords(next: LngLat[]) {
+    if (!editTarget) return;
+    const acres = areaAcres(next);
+    if (editTarget.type === 'farm') {
+      onEditFarmBoundary(next, acres);
+    } else {
+      onEditSubplot(editTarget.id, next, acres);
+    }
+  }
 
   // Clear the in-progress draft when drawMode changes away from a drawing
   // mode. Adjusted during render (not in an effect) per React's guidance for
@@ -362,10 +397,80 @@ export default function InteractiveFarmMap({
         />
       )}
 
+      {editCoords &&
+        editCoords.map((pt, i) => (
+          <Marker
+            key={`edit-${editTarget?.type}-${editTarget?.type === 'subplot' ? editTarget.id : ''}-${i}`}
+            position={[pt[1], pt[0]]}
+            draggable
+            icon={vertexIcon(editTarget?.type === 'farm' ? '#0F2D26' : editingSubplot?.color ?? '#0F2D26')}
+            eventHandlers={{
+              dragend: (e) => {
+                const { lat, lng } = (e.target as L.Marker).getLatLng();
+                commitEditedCoords(editCoords.map((c, idx) => (idx === i ? ([lng, lat] as LngLat) : c)));
+              },
+              click: () => {
+                if (editCoords.length <= 3) {
+                  onDrawError('A field needs at least 3 points.');
+                  return;
+                }
+                onDrawError(null);
+                commitEditedCoords(editCoords.filter((_, idx) => idx !== i));
+              },
+            }}
+          />
+        ))}
+
       <LocationSearchBar
         palette={palette}
         onLocate={(lat, lng) => setSearchTarget({ lat, lng, token: Date.now() })}
       />
+
+      {(drawMode === 'farm' || drawMode === 'subplot') && draft.length > 0 && (
+        <div style={{ position: 'absolute', bottom: 14, left: 14, right: 14, zIndex: 1000, display: 'flex', justifyContent: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(draft.slice(0, -1));
+              onDrawError(null);
+            }}
+            style={{
+              border: 'none',
+              borderRadius: 10,
+              padding: '9px 16px',
+              background: palette.card,
+              color: palette.dark,
+              fontWeight: 700,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+            }}
+          >
+            Undo point
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraft([]);
+              setCursor(null);
+              onDrawError(null);
+            }}
+            style={{
+              border: 'none',
+              borderRadius: 10,
+              padding: '9px 16px',
+              background: palette.dark,
+              color: palette.offwhite,
+              fontWeight: 700,
+              fontSize: 12.5,
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+            }}
+          >
+            Clear points
+          </button>
+        </div>
+      )}
     </MapContainer>
   );
 }

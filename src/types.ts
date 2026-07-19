@@ -50,7 +50,10 @@ export type ColorMode = 'traffic-light' | 'earth-tone';
 export type StatusFilter = 'all' | FieldStatus;
  
 export type DrawMode = 'idle' | 'farm' | 'subplot' | 'edit';
- 
+
+/** Which polygon 'edit' draw mode is currently reshaping. */
+export type EditTarget = { type: 'farm' } | { type: 'subplot'; id: string };
+
 /** GeoJSON-style [longitude, latitude] */
 export type LngLat = [number, number];
  
@@ -93,8 +96,25 @@ export interface Profile {
  
 export interface CropEntryForm {
   crop: string;
-  month: string; // "YYYY-MM"
+  /** @deprecated Prefer startDate; kept as YYYY-MM for API sync. */
+  month: string;
+  /** Inclusive planting start (YYYY-MM-DD). */
+  startDate: string;
+  /** Inclusive planting end (YYYY-MM-DD). Optional if still growing. */
+  endDate: string;
   isCurrent: boolean;
+  /**
+   * Snapshot of CROP_REFERENCE metadata at selection time.
+   * Enables offline NPK analysis even if the reference table changes later.
+   */
+  meta?: {
+    family: string;
+    nitrogen_demand: 'low' | 'medium' | 'high';
+    phosphorus_demand: 'low' | 'medium' | 'high';
+    potassium_demand: 'low' | 'medium' | 'high';
+    ideal_ph: [number, number];
+    preferred_soils: string[];
+  };
 }
  
 export interface AddFieldForm {

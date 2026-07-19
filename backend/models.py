@@ -94,11 +94,15 @@ class IdentifyRequest(BaseModel):
     description: Optional[str] = None
 
 
+ActionTier = Literal["monitor", "spot_treat", "broader_concern"]
+
+
 class IdentifyResult(BaseModel):
-    species: str
-    isWeed: bool
+    isPlant: bool
+    species: Optional[str] = None
+    isWeed: Optional[bool] = None
+    actionTier: Optional[ActionTier] = None
     reason: str
-    confidence: str
 
 
 class FieldRecommendationOut(BaseModel):
