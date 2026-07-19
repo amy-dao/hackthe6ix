@@ -101,6 +101,27 @@ class IdentifyResult(BaseModel):
     confidence: str
 
 
+class FieldRecommendationOut(BaseModel):
+    fieldId: str
+    fieldName: str
+    recommendedCrop: str
+    rotationDate: str
+    reason: str
+    confidence: str
+
+
+class FieldRecommendationResult(BaseModel):
+    fieldId: str
+    recommendedCrop: str
+    rotationDate: str
+    reason: str
+    confidence: str
+
+
+class RecommendationsResult(BaseModel):
+    recommendations: list[FieldRecommendationResult]
+
+
 class SignupRequest(BaseModel):
     username: str = Field(min_length=1, max_length=40)
     password: str
