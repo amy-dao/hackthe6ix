@@ -1,6 +1,7 @@
 import type { Palette } from '../palette';
 import type { LoginForm } from '../types';
 import { fieldLabelStyle, fieldInputStyle } from '../lib/formStyles';
+import cultivaLogo from '../assets/cultiva-logo.png';
 
 interface LoginScreenProps {
   palette: Palette;
@@ -46,23 +47,11 @@ export default function LoginScreen({
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: palette.dark,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22,
-            fontWeight: 800,
-            color: palette.offwhite,
-          }}
-        >
-          FI
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: palette.dark }}>Field Intelligence</div>
+        <img
+          src={cultivaLogo}
+          alt="Cultiva"
+          style={{ height: 40, width: 'auto', objectFit: 'contain' }}
+        />
       </div>
 
       <div style={{ background: palette.card, borderRadius: 18, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>

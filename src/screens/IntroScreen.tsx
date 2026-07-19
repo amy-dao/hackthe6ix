@@ -1,4 +1,5 @@
 import type { Palette } from '../palette';
+import cultivaLogo from '../assets/cultiva-logo.png';
 
 interface IntroScreenProps {
   palette: Palette;
@@ -24,9 +25,11 @@ export default function IntroScreen({ palette, userName, onContinue }: IntroScre
         boxSizing: 'border-box',
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: palette.muted }}>
-        Field Intelligence
-      </div>
+      <img
+        src={cultivaLogo}
+        alt="Cultiva"
+        style={{ height: 36, width: 'auto', alignSelf: 'flex-start', objectFit: 'contain' }}
+      />
       <div style={{ fontSize: 28, fontWeight: 800, color: palette.dark, lineHeight: 1.2 }}>
         Welcome, {firstName}
       </div>
