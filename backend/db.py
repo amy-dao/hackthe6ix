@@ -17,3 +17,4 @@ fields_collection = db["fields"]
 
 users_collection = db["users"]
 users_collection.create_index("username", unique=True)
+users_collection.create_index("sessionToken")
