@@ -3,7 +3,6 @@ import type {
   AddFieldForm,
   ColorMode,
   CropRotationRecommendation,
-  DashboardView,
   DrawMode,
   FarmState,
   Field,
@@ -12,7 +11,6 @@ import type {
   LngLat,
   Profile,
   Screen,
-  StatusFilter,
   Subplot,
   SubplotData,
 } from './types';
@@ -32,11 +30,10 @@ import {
 } from './lib/api';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
-import MapPopup from './components/MapPopup';
 import LoginScreen from './screens/LoginScreen';
 import IntroScreen from './screens/IntroScreen';
 import FarmMapScreen from './screens/FarmMapScreen';
-import DashboardScreen from './screens/DashboardScreen';
+import FieldsPage from './screens/FieldsPage';
 import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
 import AddFieldScreen from './screens/AddFieldScreen';
@@ -91,18 +88,8 @@ export default function App() {
   );
   const [selectedFieldId, setSelectedFieldId] = useState('');
   const [fields, setFields] = useState<Field[]>([]);
-  const [fieldsLoading, setFieldsLoading] = useState(true);
-  const [fieldsError, setFieldsError] = useState<string | null>(null);
-
-  const [editMode, setEditMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingCrop, setEditingCrop] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | false>(false);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [dashboardView, setDashboardView] = useState<DashboardView>('cards');
-  const [mapPopupFieldId, setMapPopupFieldId] = useState<string | null>(null);
 
   const [addForm, setAddForm] = useState<AddFieldForm>(EMPTY_ADD_FIELD_FORM);
   const [addFieldSaving, setAddFieldSaving] = useState(false);
@@ -121,12 +108,9 @@ export default function App() {
       .then((data) => {
         if (cancelled) return;
         setFields(data);
-        setFieldsLoading(false);
       })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setFieldsError(err instanceof Error ? err.message : 'Failed to load fields.');
-        setFieldsLoading(false);
+      .catch(() => {
+        /* Fields tab uses local farm geometry; API fields still hydrate for detail views when available. */
       });
     return () => {
       cancelled = true;
@@ -181,18 +165,7 @@ export default function App() {
 
   const palette = palettes[colorMode];
 
-  const visibleFields = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return fields.filter(
-      (f) =>
-        (statusFilter === 'all' || f.status === statusFilter) &&
-        (!q || f.name.toLowerCase().includes(q) || f.crop.toLowerCase().includes(q)),
-    );
-  }, [fields, searchQuery, statusFilter]);
-
-  const rotateNowCount = fields.filter((f) => f.status === 'rotate').length;
   const selectedField = fields.find((f) => f.id === selectedFieldId);
-  const mapPopupField = fields.find((f) => f.id === mapPopupFieldId) ?? null;
 
   const activeTab = (
     screen === 'detail' || screen === 'addField'
@@ -322,41 +295,14 @@ export default function App() {
     setDraftAreaAcres(0);
   }
 
-  function selectField(id: string) {
-    if (editMode) {
-      toggleSelect(id);
-      return;
-    }
-    setScreen('detail');
-    setSelectedFieldId(id);
-    setActionMessage(false);
-    setEditingCrop(false);
-  }
-
   function back() {
     setScreen('dashboard');
     setActionMessage(false);
     setEditingCrop(false);
   }
 
-  function toggleSelect(id: string) {
-    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
   function applyFieldUpdate(updated: Field) {
     setFields((fs) => fs.map((f) => (f.id === updated.id ? updated : f)));
-  }
-
-  async function clearSelected() {
-    if (!selectedIds.length) return;
-    const ids = selectedIds;
-    setSelectedIds([]);
-    try {
-      const updates = await Promise.all(ids.map((id) => clearFieldCrop(id)));
-      setFields((fs) => fs.map((f) => updates.find((u) => u.id === f.id) ?? f));
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to clear selected fields.');
-    }
   }
 
   function onAddCropEntry() {
@@ -416,7 +362,6 @@ export default function App() {
     try {
       await deleteFieldApi(id);
       setFields((fs) => fs.filter((f) => f.id !== id));
-      setSelectedIds((ids) => ids.filter((x) => x !== id));
       back();
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : 'Failed to delete field.');
@@ -508,7 +453,7 @@ export default function App() {
     runIdentify({ description: textQuery.trim() });
   }
 
-  const shellMaxWidth = screen === 'farmMap' ? 720 : 480;
+  const shellMaxWidth = screen === 'farmMap' || screen === 'dashboard' ? 720 : 480;
 
   return (
     <div
@@ -550,7 +495,7 @@ export default function App() {
             <div
               style={{
                 flex: 1,
-                overflowY: screen === 'farmMap' ? 'hidden' : 'auto',
+                overflowY: screen === 'farmMap' || screen === 'dashboard' ? 'hidden' : 'auto',
                 padding: '16px 16px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -584,47 +529,14 @@ export default function App() {
                 />
               )}
 
-              {screen === 'dashboard' && fieldsLoading && (
-                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
-                  Loading fields…
-                </div>
-              )}
-
-              {screen === 'dashboard' && !fieldsLoading && fieldsError && (
-                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13.5, color: palette.muted }}>
-                  Couldn't load fields from the server: {fieldsError}
-                </div>
-              )}
-
-              {screen === 'dashboard' && !fieldsLoading && !fieldsError && (
-                <DashboardScreen
+              {screen === 'dashboard' && (
+                <FieldsPage
                   palette={palette}
-                  fields={visibleFields}
-                  allFieldsCount={fields.length}
-                  rotateNowCount={rotateNowCount}
-                  view={dashboardView}
-                  onSetView={setDashboardView}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  statusFilter={statusFilter}
-                  onSetStatusFilter={setStatusFilter}
-                  editMode={editMode}
-                  onToggleEditMode={() => {
-                    setEditMode((v) => !v);
-                    setSelectedIds([]);
-                  }}
-                  selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                  onClearSelected={clearSelected}
-                  onSelectField={selectField}
-                  onShowMapPopup={setMapPopupFieldId}
-                  onAddField={() => {
-                    setAddForm(EMPTY_ADD_FIELD_FORM);
-                    setAddFieldError(null);
-                    setScreen('addField');
-                  }}
-                  onOpenFarmMap={() => setScreen('farmMap')}
                   farm={farm}
+                  onOpenFarmMap={() => {
+                    setDrawMode(farm.farmPolygon ? 'idle' : 'farm');
+                    setScreen('farmMap');
+                  }}
                 />
               )}
 
@@ -730,19 +642,6 @@ export default function App() {
                 />
               )}
             </div>
-
-            {mapPopupField && (
-              <MapPopup
-                palette={palette}
-                field={mapPopupField}
-                onClose={() => setMapPopupFieldId(null)}
-                onViewDetails={() => {
-                  setScreen('detail');
-                  setSelectedFieldId(mapPopupField.id);
-                  setMapPopupFieldId(null);
-                }}
-              />
-            )}
 
             <BottomNav palette={palette} activeTab={activeTab} onNavigate={setScreen} />
           </div>
