@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib import error, request
  
+ #
  
 DEFAULT_MODEL = "gemini-2.0-flash"
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
