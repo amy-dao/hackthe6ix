@@ -50,7 +50,10 @@ export type ColorMode = 'traffic-light' | 'earth-tone';
 export type StatusFilter = 'all' | FieldStatus;
  
 export type DrawMode = 'idle' | 'farm' | 'subplot' | 'edit';
- 
+
+/** Which polygon 'edit' draw mode is currently reshaping. */
+export type EditTarget = { type: 'farm' } | { type: 'subplot'; id: string };
+
 /** GeoJSON-style [longitude, latitude] */
 export type LngLat = [number, number];
  

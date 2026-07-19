@@ -5,6 +5,7 @@ import type {
   CropRotationRecommendation,
   DashboardView,
   DrawMode,
+  EditTarget,
   FarmState,
   Field,
   InputMode,
@@ -89,11 +90,16 @@ export default function App() {
 
   const [farm, setFarm] = useState<FarmState>(saved?.farm ?? EMPTY_FARM);
   const [drawMode, setDrawMode] = useState<DrawMode>('idle');
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
   const [draftAreaAcres, setDraftAreaAcres] = useState(0);
   const [drawError, setDrawError] = useState<string | null>(null);
   const [syncingSubplotId, setSyncingSubplotId] = useState<string | null>(null);
   const [subplotSyncError, setSubplotSyncError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (drawMode !== 'edit') setEditTarget(null);
+  }, [drawMode]);
 
   const [screen, setScreen] = useState<Screen>(
     saved?.userName ? (saved.introSeen ? (saved.farm.farmPolygon ? 'dashboard' : 'farmMap') : 'intro') : 'dashboard',
@@ -312,6 +318,35 @@ export default function App() {
     setFarm((f) => ({ ...f, subplots: [...f.subplots, subplot] }));
     setDrawMode('idle');
     setDraftAreaAcres(0);
+  }
+
+  function startEditFarmBoundary() {
+    setSelectedSubplotId(null);
+    setDrawError(null);
+    setEditTarget({ type: 'farm' });
+    setDrawMode('edit');
+  }
+
+  function startEditSubplot(id: string) {
+    setDrawError(null);
+    setEditTarget({ type: 'subplot', id });
+    setDrawMode('edit');
+  }
+
+  function finishEditing() {
+    setDrawMode('idle');
+    setEditTarget(null);
+  }
+
+  function handleEditFarmBoundary(coords: LngLat[], acres: number) {
+    setFarm((f) => ({ ...f, farmPolygon: coords, farmAreaAcres: acres }));
+  }
+
+  function handleEditSubplotShape(id: string, coords: LngLat[], areaAcres: number) {
+    setFarm((f) => ({
+      ...f,
+      subplots: f.subplots.map((s) => (s.id === id ? { ...s, coordinates: coords, areaAcres } : s)),
+    }));
   }
 
   function handleUpdateSubplotData(id: string, data: SubplotData) {
@@ -647,6 +682,7 @@ export default function App() {
                   palette={palette}
                   farm={farm}
                   drawMode={drawMode}
+                  editTarget={editTarget}
                   selectedSubplotId={selectedSubplotId}
                   draftAreaAcres={draftAreaAcres}
                   drawError={drawError}
@@ -666,6 +702,11 @@ export default function App() {
                   onDrawError={setDrawError}
                   onViewField={viewFieldFromSubplot}
                   onDone={() => setScreen('dashboard')}
+                  onStartEditFarmBoundary={startEditFarmBoundary}
+                  onStartEditSubplot={startEditSubplot}
+                  onFinishEditing={finishEditing}
+                  onEditFarmBoundary={handleEditFarmBoundary}
+                  onEditSubplot={handleEditSubplotShape}
                 />
               )}
 

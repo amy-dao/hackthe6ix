@@ -22,6 +22,7 @@ interface SubplotFormProps {
   onDelete: () => void;
   onClose: () => void;
   onViewField?: (fieldId: string) => void;
+  onEditPoints?: () => void;
 }
 
 export default function SubplotForm({
@@ -38,6 +39,7 @@ export default function SubplotForm({
   onDelete,
   onClose,
   onViewField,
+  onEditPoints,
 }: SubplotFormProps) {
   const panel: CSSProperties = {
     background: palette.card,
@@ -60,7 +62,18 @@ export default function SubplotForm({
           <div style={{ width: 14, height: 14, borderRadius: 4, background: color, flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: palette.dark }}>{data.name || 'Field'}</div>
-            <div style={{ fontSize: 12.5, color: palette.muted }}>{areaAcres.toFixed(2)} acres</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 12.5, color: palette.muted }}>{areaAcres.toFixed(2)} acres</div>
+              {onEditPoints && (
+                <button
+                  type="button"
+                  onClick={onEditPoints}
+                  style={{ border: 'none', background: 'transparent', color: palette.accent, fontWeight: 700, fontSize: 12, cursor: 'pointer', padding: 0 }}
+                >
+                  Edit shape
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <button
