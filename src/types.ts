@@ -12,7 +12,14 @@ export interface PlantingRecord {
   fertilizerUsed?: string;
   pesticidesApplied?: string;
 }
- 
+
+export interface SubplotRecommendations {
+  rotation_recommendation: number | 'Unknown';
+  rotation_probability?: number | null;
+  rotation_label?: string | null;
+  soil_exhaustion_score: number | 'Unknown';
+}
+
 export interface Field {
   id: string;
   name: string;
@@ -29,6 +36,7 @@ export interface Field {
   history: PlantingRecord[];
   soilPh: number | null;
   soilType: string | null;
+  recommendations?: SubplotRecommendations | null;
 }
  
 export type Screen =
@@ -65,8 +73,10 @@ export interface SubplotData {
   name: string;
   /** Set once this subplot has been saved as a real Field (matched or created by name). */
   linkedFieldId?: string;
+  /** Latest XGBoost inference result (auto-filled when features are complete). */
+  recommendations?: SubplotRecommendations | null;
 }
- 
+
 export interface Subplot {
   id: string;
   coordinates: LngLat[];

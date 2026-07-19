@@ -40,6 +40,7 @@ class FieldOut(BaseModel):
     history: list[PlantingRecord]
     soilPh: Optional[float] = None
     soilType: Optional[SoilType] = None
+    recommendations: Optional["SubplotRecommendations"] = None
 
 
 class CropEntry(BaseModel):
@@ -145,3 +146,62 @@ class UserOut(BaseModel):
 class UpdateAccountRequest(BaseModel):
     username: Optional[str] = Field(default=None, min_length=1, max_length=40)
     password: Optional[str] = None
+
+
+class PredictRequest(BaseModel):
+    """Inputs for subplot rotation + soil exhaustion models."""
+
+    soil_type: Optional[str] = None
+    crop_history: list[str] = []
+    next_crop: Optional[str] = None
+    planned_crop: Optional[str] = None
+    current_crop: Optional[str] = None
+    previous_crops: Optional[list[str]] = None
+    plot_size_hectares: Optional[float] = Field(default=None, ge=0)
+    acres: Optional[float] = Field(default=None, ge=0)
+    soil_ph: Optional[float] = Field(default=None, ge=3.5, le=9)
+    other_features: Optional[dict] = None
+    subplot_id: Optional[str] = None
+
+
+class SubplotRecommendations(BaseModel):
+    """Model output, or literal \"Unknown\" when required features are missing."""
+
+    rotation_recommendation: Union[int, Literal["Unknown"]]
+    soil_exhaustion_score: Union[float, Literal["Unknown"]]
+    rotation_probability: Optional[float] = None
+    rotation_label: Optional[str] = None
+
+
+UNKNOWN_RECOMMENDATIONS = SubplotRecommendations(
+    rotation_recommendation="Unknown",
+    soil_exhaustion_score="Unknown",
+    rotation_probability=None,
+    rotation_label="Unknown",
+)
+
+
+class PredictResponse(BaseModel):
+    subplot_id: Optional[str] = None
+    ready: bool = True
+    missing_fields: list[str] = []
+    rotation_recommendation: Optional[Union[int, Literal["Unknown"]]] = None
+    soil_exhaustion_score: Optional[Union[float, Literal["Unknown"]]] = None
+    rotation_probability: Optional[float] = None
+    rotation_label: Optional[str] = None
+    recommendations: Optional[SubplotRecommendations] = None
+
+
+class PredictBatchRequest(BaseModel):
+    items: list[PredictRequest]
+
+
+class PredictBatchItemResult(BaseModel):
+    subplot_id: Optional[str] = None
+    ready: bool
+    missing_fields: list[str] = []
+    recommendations: Optional[SubplotRecommendations] = None
+
+
+class PredictBatchResponse(BaseModel):
+    predictions: list[PredictBatchItemResult]

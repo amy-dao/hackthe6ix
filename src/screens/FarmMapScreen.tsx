@@ -253,7 +253,7 @@ export default function FarmMapScreen({
       <div
         style={{
           flex: 1,
-          minHeight: 320,
+          minHeight: selected && !editing ? 160 : 320,
           borderRadius: 16,
           overflow: 'hidden',
           position: 'relative',
@@ -317,7 +317,20 @@ export default function FarmMapScreen({
       )}
 
       {selected && !editing && (
-        <div style={{ flexShrink: 0, marginTop: 12, marginLeft: -16, marginRight: -16, marginBottom: -16 }}>
+        <div
+          style={{
+            flex: '1 1 42%',
+            minHeight: 220,
+            maxHeight: '52vh',
+            marginTop: 12,
+            marginLeft: -16,
+            marginRight: -16,
+            marginBottom: -16,
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
+          }}
+        >
           <SubplotForm
             palette={palette}
             data={selected.data}

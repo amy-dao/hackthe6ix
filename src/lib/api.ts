@@ -122,3 +122,55 @@ export function login(username: string, password: string): Promise<User> {
 export function updateAccount(updates: { username?: string; password?: string }): Promise<User> {
   return request<User>('/account', { method: 'PATCH', body: JSON.stringify(updates) });
 }
+
+export interface PredictRequestBody {
+  soil_type?: string;
+  crop_history?: string[];
+  next_crop?: string;
+  planned_crop?: string;
+  current_crop?: string;
+  previous_crops?: string[];
+  plot_size_hectares?: number;
+  acres?: number;
+  soil_ph?: number;
+  other_features?: Record<string, unknown>;
+  subplot_id?: string;
+}
+
+export interface SubplotRecommendationsDto {
+  rotation_recommendation: number | 'Unknown';
+  rotation_probability?: number | null;
+  rotation_label?: string | null;
+  soil_exhaustion_score: number | 'Unknown';
+}
+
+export interface PredictResponse {
+  subplot_id?: string | null;
+  ready: boolean;
+  missing_fields: string[];
+  rotation_recommendation?: number | null;
+  soil_exhaustion_score?: number | null;
+  rotation_probability?: number | null;
+  rotation_label?: string | null;
+  recommendations?: SubplotRecommendationsDto | null;
+}
+
+export interface PredictBatchItemResult {
+  subplot_id?: string | null;
+  ready: boolean;
+  missing_fields: string[];
+  recommendations?: SubplotRecommendationsDto | null;
+}
+
+export function predictRecommendation(payload: PredictRequestBody): Promise<PredictResponse> {
+  return request<PredictResponse>('/predict', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function predictRecommendationsBatch(
+  items: PredictRequestBody[],
+): Promise<{ predictions: PredictBatchItemResult[] }> {
+  return request<{ predictions: PredictBatchItemResult[] }>('/predict/batch', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+}

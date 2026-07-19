@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AddFieldForm,
   ColorMode,
@@ -26,12 +26,14 @@ import {
   identify as identifyApi,
   type IdentifyResult as ApiIdentifyResult,
   login as loginApi,
+  predictRecommendation,
   setAuthToken,
   setFieldCrop,
   syncField as syncFieldApi,
   updateAccount as updateAccountApi,
   updateField as updateFieldApi,
 } from './lib/api';
+import { subplotToPredictPayload } from './lib/mlPredict';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import IntroScreen from './screens/IntroScreen';
@@ -93,6 +95,9 @@ export default function App() {
   const [drawError, setDrawError] = useState<string | null>(null);
   const [syncingSubplotId, setSyncingSubplotId] = useState<string | null>(null);
   const [subplotSyncError, setSubplotSyncError] = useState<string | null>(null);
+  const inferTimers = useRef<Record<string, number>>({});
+  const farmRef = useRef(farm);
+  farmRef.current = farm;
 
   useEffect(() => {
     if (drawMode !== 'edit') setEditTarget(null);
@@ -314,6 +319,33 @@ export default function App() {
       ...f,
       subplots: f.subplots.map((s) => (s.id === id ? { ...s, data } : s)),
     }));
+
+    // Debounced auto-inference: when soil/crops/ph become complete, score silently.
+    const existing = inferTimers.current[id];
+    if (existing) window.clearTimeout(existing);
+    inferTimers.current[id] = window.setTimeout(() => {
+      void (async () => {
+        const subplot = farmRef.current.subplots.find((s) => s.id === id);
+        if (!subplot) return;
+        const latest: Subplot = { ...subplot, data };
+        try {
+          const res = await predictRecommendation(subplotToPredictPayload(latest));
+          const rec = res.recommendations ?? {
+            rotation_recommendation: 'Unknown' as const,
+            soil_exhaustion_score: 'Unknown' as const,
+            rotation_label: 'Unknown',
+          };
+          setFarm((f) => ({
+            ...f,
+            subplots: f.subplots.map((s) =>
+              s.id === id ? { ...s, data: { ...s.data, recommendations: rec } } : s,
+            ),
+          }));
+        } catch {
+          /* offline / models not loaded — keep local heuristic */
+        }
+      })();
+    }, 400);
   }
 
   async function handleSaveSubplot(id: string) {
@@ -346,7 +378,18 @@ export default function App() {
       });
       setFarm((f) => ({
         ...f,
-        subplots: f.subplots.map((s) => (s.id === id ? { ...s, data: { ...s.data, linkedFieldId: synced.id } } : s)),
+        subplots: f.subplots.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                data: {
+                  ...s.data,
+                  linkedFieldId: synced.id,
+                  recommendations: synced.recommendations ?? s.data.recommendations ?? null,
+                },
+              }
+            : s,
+        ),
       }));
     } catch (err) {
       setSubplotSyncError(err instanceof Error ? err.message : 'Failed to save field.');
@@ -724,6 +767,14 @@ export default function App() {
                   onOpenSubplot={(id) => {
                     setFocusSubplotId(id);
                     setScreen('dashboard');
+                  }}
+                  onRecommendationsUpdate={(id, rec) => {
+                    setFarm((f) => ({
+                      ...f,
+                      subplots: f.subplots.map((s) =>
+                        s.id === id ? { ...s, data: { ...s.data, recommendations: rec } } : s,
+                      ),
+                    }));
                   }}
                 />
               )}

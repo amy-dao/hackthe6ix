@@ -1,5 +1,6 @@
 import re
 import secrets
+from contextlib import asynccontextmanager
 
 import bcrypt
 from bson import ObjectId
@@ -13,22 +14,48 @@ from .crop_reference import CROP_REFERENCE, SOIL_TYPES
 from .db import fields_collection, users_collection
 from .gemini import identify_plant, recommend_rotations
 from .logic import derive_planting_status, empty_field_set, format_month_label, planted_field_set
+from .model_service import (
+    has_required_features,
+    missing_required_features,
+    try_get_model_service,
+    unknown_recommendations,
+)
 from .models import (
     AddFieldRequest,
     FieldOut,
     IdentifyRequest,
     IdentifyResult,
     LoginRequest,
+    PredictBatchItemResult,
+    PredictBatchRequest,
+    PredictBatchResponse,
+    PredictRequest,
+    PredictResponse,
     ReferenceOut,
     SetCropRequest,
     SignupRequest,
+    SubplotRecommendations,
     SyncFieldRequest,
     UpdateAccountRequest,
     UpdateFieldRequest,
     UserOut,
 )
 
-app = FastAPI(title="Field Intelligence API")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Load XGBoost models once into memory — never per request.
+    from .model_service import init_model_service
+
+    service = init_model_service()
+    if service is not None:
+        print("Recommendation models loaded at startup.")
+    else:
+        print("Recommendation models unavailable — /predict will report not ready until trained.")
+    yield
+
+
+app = FastAPI(title="Field Intelligence API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +95,50 @@ def serialize_field(doc: dict) -> dict:
     doc = dict(doc)
     doc["id"] = str(doc.pop("_id"))
     doc.pop("ownerId", None)
+    return doc
+
+
+def _field_to_subplot_features(doc: dict) -> dict:
+    """Map a Mongo field document into the inference input shape."""
+    history_crops = []
+    for h in doc.get("history") or []:
+        crop = h.get("crop") if isinstance(h, dict) else None
+        if crop:
+            history_crops.append(str(crop).strip().lower())
+    # history in FieldOut is newest-first; models expect oldest → newest
+    history_crops = list(reversed(history_crops))
+    next_crop = doc.get("crop")
+    if next_crop in (None, "", "No crop planted"):
+        next_crop = None
+    return {
+        "soil_type": doc.get("soilType"),
+        "crop_history": history_crops,
+        "next_crop": next_crop,
+        "soil_ph": doc.get("soilPh"),
+        "acres": doc.get("acres") if isinstance(doc.get("acres"), (int, float)) else None,
+        "subplot_id": str(doc.get("_id") or doc.get("id") or ""),
+    }
+
+
+def attach_recommendations_if_ready(doc: dict) -> dict:
+    """
+    When a field/subplot has all required features, run XGBoost inference
+    and store results on ``doc['recommendations']``. Otherwise store Unknown.
+    """
+    service = try_get_model_service()
+    features = _field_to_subplot_features(doc)
+    if not has_required_features(features):
+        doc["recommendations"] = unknown_recommendations()
+        return doc
+    if service is None:
+        doc["recommendations"] = unknown_recommendations()
+        return doc
+    try:
+        result = service.run_model_inference(features)
+        doc["recommendations"] = result
+    except Exception as exc:  # noqa: BLE001
+        print(f"Inference skipped for field {features.get('subplot_id')}: {exc}")
+        doc["recommendations"] = unknown_recommendations()
     return doc
 
 
@@ -161,6 +232,7 @@ def add_field(payload: AddFieldRequest, current_user: dict = Depends(get_current
     """
     doc = field_fields_from_entries(payload.name, payload.acres, payload.soilPh, payload.soilType, payload.cropEntries)
     doc["ownerId"] = str(current_user["_id"])
+    attach_recommendations_if_ready(doc)
     result = fields_collection.insert_one(doc)
     return serialize_field({**doc, "_id": result.inserted_id})
 
@@ -175,6 +247,7 @@ def sync_field(payload: SyncFieldRequest, current_user: dict = Depends(get_curre
     owner_id = str(current_user["_id"])
     fields = field_fields_from_entries(payload.name, payload.acres, payload.soilPh, payload.soilType, payload.cropEntries)
     fields["ownerId"] = owner_id
+    attach_recommendations_if_ready(fields)
     doc = fields_collection.find_one_and_update(
         {"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}, "ownerId": owner_id},
         {"$set": fields},
@@ -191,6 +264,10 @@ def update_field(field_id: str, payload: UpdateFieldRequest, current_user: dict 
     if "history" in updates and existing.get("status") != "empty":
         updates.update(derive_planting_status(existing["crop"], updates["history"]))
     if updates:
+        merged = {**existing, **updates}
+        attach_recommendations_if_ready(merged)
+        if "recommendations" in merged:
+            updates["recommendations"] = merged["recommendations"]
         fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
         existing = {**existing, **updates}
     return serialize_field(existing)
@@ -203,6 +280,10 @@ def set_crop(field_id: str, payload: SetCropRequest, current_user: dict = Depend
     recomputed from there."""
     existing = get_field_or_404(field_id, str(current_user["_id"]))
     updates = planted_field_set(existing, require_known_crop(payload.cropName.strip()))
+    merged = {**existing, **updates}
+    attach_recommendations_if_ready(merged)
+    if "recommendations" in merged:
+        updates["recommendations"] = merged["recommendations"]
     fields_collection.update_one({"_id": existing["_id"]}, {"$set": updates})
     return serialize_field({**existing, **updates})
 
@@ -276,3 +357,112 @@ def update_account(payload: UpdateAccountRequest, current_user: dict = Depends(g
     except DuplicateKeyError:
         raise HTTPException(status_code=409, detail="That username is already taken.")
     return serialize_user(users_collection.find_one({"_id": current_user["_id"]}))
+
+
+def _predict_payload_dict(payload: PredictRequest) -> dict:
+    history = list(payload.crop_history or [])
+    if not history and payload.previous_crops:
+        history = list(payload.previous_crops)
+    return {
+        "soil_type": payload.soil_type,
+        "crop_history": history,
+        "next_crop": payload.next_crop or payload.planned_crop or payload.current_crop,
+        "plot_size_hectares": payload.plot_size_hectares,
+        "acres": payload.acres,
+        "soil_ph": payload.soil_ph,
+        "other_features": payload.other_features or {},
+        "subplot_id": payload.subplot_id,
+    }
+
+
+@app.post("/predict", response_model=PredictResponse)
+def predict_recommendation(payload: PredictRequest):
+    """
+    Auto-inference for one subplot.
+
+    If required features are complete → run models and return recommendations.
+    If not → return Unknown for rotation + exhaustion (models are not run).
+    """
+    raw = _predict_payload_dict(payload)
+    missing = missing_required_features(raw)
+    if missing:
+        unknown = unknown_recommendations()
+        return PredictResponse(
+            subplot_id=payload.subplot_id,
+            ready=False,
+            missing_fields=missing,
+            rotation_recommendation="Unknown",
+            soil_exhaustion_score="Unknown",
+            rotation_label="Unknown",
+            recommendations=SubplotRecommendations(**unknown),
+        )
+
+    service = try_get_model_service()
+    if service is None:
+        unknown = unknown_recommendations()
+        return PredictResponse(
+            subplot_id=payload.subplot_id,
+            ready=False,
+            missing_fields=["models_not_loaded"],
+            rotation_recommendation="Unknown",
+            soil_exhaustion_score="Unknown",
+            rotation_label="Unknown",
+            recommendations=SubplotRecommendations(**unknown),
+        )
+
+    result = service.run_model_inference(raw)
+    rec = SubplotRecommendations(**result)
+    return PredictResponse(
+        subplot_id=payload.subplot_id,
+        ready=True,
+        missing_fields=[],
+        rotation_recommendation=rec.rotation_recommendation,
+        soil_exhaustion_score=rec.soil_exhaustion_score,
+        rotation_probability=rec.rotation_probability,
+        rotation_label=rec.rotation_label,
+        recommendations=rec,
+    )
+
+
+@app.post("/predict/batch", response_model=PredictBatchResponse)
+def predict_recommendations_batch(payload: PredictBatchRequest):
+    """Score many subplots; incomplete ones get Unknown without running models."""
+    service = try_get_model_service()
+    items = [_predict_payload_dict(item) for item in payload.items]
+    predictions: list[PredictBatchItemResult] = []
+    unknown = SubplotRecommendations(**unknown_recommendations())
+
+    if service is None:
+        for item, raw in zip(payload.items, items):
+            missing = missing_required_features(raw) or ["models_not_loaded"]
+            predictions.append(
+                PredictBatchItemResult(
+                    subplot_id=item.subplot_id,
+                    ready=False,
+                    missing_fields=missing,
+                    recommendations=unknown,
+                )
+            )
+        return PredictBatchResponse(predictions=predictions)
+
+    scored = service.predict_many(items)
+    for item, raw, result in zip(payload.items, items, scored):
+        if result is None:
+            predictions.append(
+                PredictBatchItemResult(
+                    subplot_id=item.subplot_id,
+                    ready=False,
+                    missing_fields=missing_required_features(raw),
+                    recommendations=unknown,
+                )
+            )
+        else:
+            predictions.append(
+                PredictBatchItemResult(
+                    subplot_id=item.subplot_id,
+                    ready=True,
+                    missing_fields=[],
+                    recommendations=SubplotRecommendations(**result),
+                )
+            )
+    return PredictBatchResponse(predictions=predictions)

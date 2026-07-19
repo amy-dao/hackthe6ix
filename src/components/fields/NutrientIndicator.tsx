@@ -10,6 +10,7 @@ interface NutrientIndicatorProps {
 }
 
 export default function NutrientIndicator({ palette, label, status }: NutrientIndicatorProps) {
+  const unknown = status === 'UNKNOWN';
   const color = nutrientStatusColor(status);
 
   const shell: CSSProperties = {
@@ -45,11 +46,22 @@ export default function NutrientIndicator({ palette, label, status }: NutrientIn
           height: 36,
           borderRadius: '50%',
           background: color,
-          opacity: 0.95,
-          boxShadow: `0 0 0 4px ${color}22`,
+          opacity: unknown ? 0.45 : 0.95,
+          boxShadow: unknown ? 'none' : `0 0 0 4px ${color}22`,
         }}
       />
-      <div style={{ fontSize: 13, fontWeight: 800, color, letterSpacing: '0.04em' }}>{status}</div>
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 800,
+          color,
+          letterSpacing: '0.04em',
+          fontStyle: unknown ? 'italic' : 'normal',
+          textTransform: unknown ? 'none' : 'uppercase',
+        }}
+      >
+        {unknown ? 'Unknown' : status}
+      </div>
     </div>
   );
 }

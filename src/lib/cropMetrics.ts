@@ -1,7 +1,7 @@
 import type { CropEntryForm } from '../types';
 
 export type DemandLevel = 'low' | 'medium' | 'high';
-export type NutrientStatus = 'LOW' | 'MEDIUM' | 'HIGH';
+export type NutrientStatus = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
 export type NutrientKey = 'nitrogen' | 'phosphorus' | 'potassium';
 export type SoilType = 'clay' | 'loam' | 'sandy' | 'silt';
 
@@ -235,6 +235,26 @@ export function computeNutrientLevels(cropNames: string[]): Record<NutrientKey, 
 export function computeNutrientLevelsFromHistory(
   history: Array<string | CropEntryForm>,
 ): Record<NutrientKey, NutrientStatus> {
+  const unknown = {
+    nitrogen: 'UNKNOWN' as const,
+    phosphorus: 'UNKNOWN' as const,
+    potassium: 'UNKNOWN' as const,
+  };
+
+  // No current crop → Unknown (not a fake MEDIUM for all three).
+  const hasCurrent = history.some((item) => {
+    if (typeof item === 'string') return Boolean(item.trim());
+    return Boolean(item.isCurrent && item.crop.trim());
+  });
+  // Timeline convention: if nothing is flagged current, the last named entry counts.
+  const hasNamed =
+    hasCurrent ||
+    [...history].reverse().some((item) =>
+      typeof item === 'string' ? Boolean(item.trim()) : Boolean(item.crop.trim()),
+    );
+  if (!hasNamed) return unknown;
+
+  // Prefer scoring from the current crop + history; still Unknown if we can't resolve any crop meta.
   const totals: Record<NutrientKey, number> = { nitrogen: 0, phosphorus: 0, potassium: 0 };
   let counted = 0;
 
@@ -249,9 +269,7 @@ export function computeNutrientLevelsFromHistory(
     counted += 1;
   }
 
-  if (counted === 0) {
-    return { nitrogen: 'MEDIUM', phosphorus: 'MEDIUM', potassium: 'MEDIUM' };
-  }
+  if (counted === 0) return unknown;
 
   return {
     nitrogen: nutrientStatusFromAverage(totals.nitrogen / counted),
@@ -302,6 +320,7 @@ export function exhaustionColor(score: number): string {
 }
 
 export function nutrientStatusColor(status: NutrientStatus): string {
+  if (status === 'UNKNOWN') return '#8A8F8A';
   if (status === 'HIGH') return '#3E7B4F';
   if (status === 'MEDIUM') return '#E0A030';
   return '#C0392B';

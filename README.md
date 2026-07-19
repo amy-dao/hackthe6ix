@@ -142,3 +142,13 @@ backend/
 `main.py`, `requirements*.txt`, and `tests/test_main.py` are an
 early Python scaffold (unrelated to the app above — pending sync with
 its author).
+
+## Recommendation models (XGBoost)
+
+```powershell
+.\.venv\Scripts\python.exe ml\train_models.py --data ml\data\synthetic_dataset.csv
+```
+
+Restart the backend after training. The **Recommend** tab and subplot
+detail panel call `POST /predict` and `POST /predict/batch`. Full
+docs and curl examples: [`ml/README.md`](ml/README.md).
