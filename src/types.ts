@@ -44,7 +44,6 @@ export interface Field {
  
 export type Screen =
   | 'dashboard'
-  | 'detail'
   | 'camera'
   | 'recommendation'
   | 'profile'

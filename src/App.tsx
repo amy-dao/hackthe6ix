@@ -9,7 +9,6 @@ import type {
   Field,
   InputMode,
   LngLat,
-  PlantingRecord,
   Profile,
   Screen,
   Subplot,
@@ -19,8 +18,6 @@ import { palettes } from './palette';
 import { EMPTY_FARM, loadSession, saveSession } from './lib/storage';
 import {
   addField as addFieldApi,
-  clearFieldCrop,
-  deleteField as deleteFieldApi,
   fetchFarmState,
   fetchFields,
   fetchReference,
@@ -31,23 +28,20 @@ import {
   saveFarmState,
   setAuthToken,
   setUnauthorizedHandler,
-  setFieldCrop,
   syncField as syncFieldApi,
   updateAccount as updateAccountApi,
-  updateField as updateFieldApi,
 } from './lib/api';
 import { subplotToPredictPayload } from './lib/mlPredict';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import FarmMapScreen from './screens/FarmMapScreen';
 import FieldsPage from './screens/FieldsPage';
-import FieldDetailScreen from './screens/FieldDetailScreen';
 import IdentifyScreen, { type ScanResult } from './screens/IdentifyScreen';
 import AddFieldScreen from './screens/AddFieldScreen';
 import RecommendationScreen from './screens/CropRecommendationScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
-const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
+const HEADER_MAP: Record<Screen, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
   recommendation: { eyebrow: 'Field Intelligence', title: 'Recommendation' },
@@ -107,10 +101,7 @@ export default function App() {
   }, [drawMode]);
 
   const [screen, setScreen] = useState<Screen>('dashboard');
-  const [selectedFieldId, setSelectedFieldId] = useState('');
   const [fields, setFields] = useState<Field[]>([]);
-  const [editingCrop, setEditingCrop] = useState(false);
-  const [actionMessage, setActionMessage] = useState<string | false>(false);
 
   const [addForm, setAddForm] = useState<AddFieldForm>(EMPTY_ADD_FIELD_FORM);
   const [addFieldSaving, setAddFieldSaving] = useState(false);
@@ -268,23 +259,16 @@ export default function App() {
 
   const palette = palettes[colorMode];
 
-  const selectedField = fields.find((f) => f.id === selectedFieldId);
-
   const activeTab = (
-    screen === 'detail' || screen === 'addField'
+    screen === 'addField'
       ? 'dashboard'
       : screen === 'farmMap'
         ? 'farmMap'
         : screen
   ) as 'dashboard' | 'camera' | 'recommendation' | 'profile' | 'farmMap';
 
-  const showBack = screen === 'detail' || screen === 'addField' || (screen === 'camera' && captured);
-  const header =
-    screen === 'detail'
-      ? selectedField
-        ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} acres`, title: selectedField.name }
-        : { eyebrow: 'Field Intelligence', title: 'Field' }
-      : HEADER_MAP[screen as Exclude<Screen, 'detail'>];
+  const showBack = screen === 'addField' || (screen === 'camera' && captured);
+  const header = HEADER_MAP[screen];
 
   async function updateAccount(updates: {
     username?: string;
@@ -443,8 +427,10 @@ export default function App() {
   }
 
   function viewFieldFromSubplot(fieldId: string) {
-    setScreen('detail');
-    setSelectedFieldId(fieldId);
+    const subplot = farm.subplots.find((s) => s.data.linkedFieldId === fieldId);
+    if (!subplot) return;
+    setFocusSubplotId(subplot.id);
+    setScreen('dashboard');
   }
 
   function handleDeleteSubplot(id: string) {
@@ -462,12 +448,6 @@ export default function App() {
 
   function back() {
     setScreen('dashboard');
-    setActionMessage(false);
-    setEditingCrop(false);
-  }
-
-  function applyFieldUpdate(updated: Field) {
-    setFields((fs) => fs.map((f) => (f.id === updated.id ? updated : f)));
   }
 
   function onAddCropEntry() {
@@ -536,63 +516,6 @@ export default function App() {
     } finally {
       setAddFieldSaving(false);
     }
-  }
-
-  async function deleteSelectedField() {
-    const id = selectedFieldId;
-    try {
-      await deleteFieldApi(id);
-      setFields((fs) => fs.filter((f) => f.id !== id));
-      back();
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to delete field.');
-    }
-  }
-
-  async function clearCropInDetail() {
-    try {
-      applyFieldUpdate(await clearFieldCrop(selectedFieldId));
-      setEditingCrop(false);
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to clear crop.');
-    }
-  }
-
-  async function setCrop(cropName: string) {
-    try {
-      applyFieldUpdate(await setFieldCrop(selectedFieldId, cropName));
-      setEditingCrop(false);
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to update crop.');
-    }
-  }
-
-  async function saveFieldEdits(updates: { name: string; acres: number; soilPh?: number; soilType: string }) {
-    try {
-      applyFieldUpdate(await updateFieldApi(selectedFieldId, updates));
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to save field.');
-    }
-  }
-
-  async function saveHistoryRecords(nextHistory: PlantingRecord[]) {
-    try {
-      applyFieldUpdate(await updateFieldApi(selectedFieldId, { history: nextHistory }));
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to save planting history.');
-    }
-  }
-
-  function addHistoryRecord(record: PlantingRecord) {
-    const field = fields.find((f) => f.id === selectedFieldId);
-    if (!field) return;
-    void saveHistoryRecords([record, ...field.history]);
-  }
-
-  function editHistoryRecord(index: number, record: PlantingRecord) {
-    const field = fields.find((f) => f.id === selectedFieldId);
-    if (!field) return;
-    void saveHistoryRecords(field.history.map((r, i) => (i === index ? record : r)));
   }
 
   function buildScanResult(result: ApiIdentifyResult): ScanResult {
@@ -735,29 +658,6 @@ export default function App() {
                     setDrawMode(farm.farmPolygon ? 'idle' : 'farm');
                     setScreen('farmMap');
                   }}
-                />
-              )}
-
-              {screen === 'detail' && selectedField && (
-                <FieldDetailScreen
-                  key={selectedField.id}
-                  palette={palette}
-                  field={selectedField}
-                  cropOptions={referenceCrops}
-                  soilTypeOptions={referenceSoilTypes}
-                  editingCrop={editingCrop}
-                  actionMessage={actionMessage}
-                  onStartEditCrop={() => setEditingCrop(true)}
-                  onCancelEditCrop={() => setEditingCrop(false)}
-                  onSelectCrop={setCrop}
-                  onClearCrop={clearCropInDetail}
-                  onAccept={() => setActionMessage('Recommendation accepted.')}
-                  onOverride={() => setActionMessage('Marked as overridden by farmer.')}
-                  onDismiss={() => setActionMessage('Recommendation dismissed.')}
-                  onSaveField={saveFieldEdits}
-                  onDeleteField={deleteSelectedField}
-                  onAddHistoryRecord={addHistoryRecord}
-                  onEditHistoryRecord={editHistoryRecord}
                 />
               )}
 
