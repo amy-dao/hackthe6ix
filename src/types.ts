@@ -79,6 +79,7 @@ export interface FarmState {
  
 export interface PersistedSession {
   userName: string;
+  token: string;
   introSeen: boolean;
   farm: FarmState;
 }
