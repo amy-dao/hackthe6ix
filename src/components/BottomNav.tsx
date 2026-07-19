@@ -54,6 +54,7 @@ export default function BottomNav({ palette, activeTab, onNavigate }: BottomNavP
             data-testid={`nav-${tab.key}`}
             style={{
               flex: 1,
+              minWidth: 0,
               padding: '12px 4px 13px',
               textAlign: 'center',
               cursor: 'pointer',
