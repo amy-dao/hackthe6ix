@@ -6,18 +6,29 @@ interface LoginScreenProps {
   palette: Palette;
   loginForm: LoginForm;
   loginError: string;
+  mode: 'login' | 'signup';
+  submitting: boolean;
   onChangeName: (value: string) => void;
   onChangePassword: (value: string) => void;
   onSignIn: () => void;
+  onSelectMode: (mode: 'login' | 'signup') => void;
 }
+
+const TABS: { id: 'login' | 'signup'; label: string }[] = [
+  { id: 'login', label: 'Sign in' },
+  { id: 'signup', label: 'Create account' },
+];
 
 export default function LoginScreen({
   palette,
   loginForm,
   loginError,
+  mode,
+  submitting,
   onChangeName,
   onChangePassword,
   onSignIn,
+  onSelectMode,
 }: LoginScreenProps) {
   return (
     <div
@@ -50,60 +61,87 @@ export default function LoginScreen({
           FI
         </div>
         <div style={{ fontSize: 20, fontWeight: 800, color: palette.dark }}>Field Intelligence</div>
-        <div style={{ fontSize: 13, color: palette.muted, textAlign: 'center' }}>
-          Sign in to map your farm and subplots
+      </div>
+
+      <div style={{ background: palette.card, borderRadius: 18, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', gap: 6, background: palette.bg, borderRadius: 12, padding: 4 }}>
+          {TABS.map((t) => (
+            <div
+              key={t.id}
+              onClick={() => onSelectMode(t.id)}
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                padding: '9px 0',
+                borderRadius: 9,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: mode === t.id ? palette.dark : 'transparent',
+                color: mode === t.id ? palette.offwhite : palette.muted,
+              }}
+            >
+              {t.label}
+            </div>
+          ))}
         </div>
-      </div>
 
-      <div>
-        <div style={fieldLabelStyle(palette)}>Name</div>
-        <input
-          value={loginForm.name}
-          onChange={(e) => onChangeName(e.target.value)}
-          placeholder="Your name"
-          autoComplete="name"
-          style={{ ...fieldInputStyle(palette), padding: 11, background: palette.card }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onSignIn();
+        <div style={{ fontSize: 12.5, color: palette.muted, textAlign: 'center' }}>
+          {mode === 'login' ? 'Sign in to map your farm and subplots' : 'Create an account to get started'}
+        </div>
+
+        <div>
+          <div style={fieldLabelStyle(palette)}>Username</div>
+          <input
+            value={loginForm.name}
+            onChange={(e) => onChangeName(e.target.value)}
+            placeholder="Your username"
+            autoComplete="username"
+            style={{ ...fieldInputStyle(palette), padding: 11, background: palette.bg }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSignIn();
+            }}
+          />
+        </div>
+        <div>
+          <div style={fieldLabelStyle(palette)}>Password</div>
+          <input
+            type="password"
+            value={loginForm.password}
+            onChange={(e) => onChangePassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            style={{ ...fieldInputStyle(palette), padding: 11, background: palette.bg }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSignIn();
+            }}
+          />
+        </div>
+
+        {loginError && (
+          <div style={{ fontSize: 12.5, color: palette.rotate.bg, fontWeight: 600 }}>{loginError}</div>
+        )}
+
+        <button
+          type="button"
+          onClick={onSignIn}
+          disabled={submitting}
+          style={{
+            border: 'none',
+            textAlign: 'center',
+            padding: '14px 0',
+            borderRadius: 12,
+            background: palette.dark,
+            color: palette.offwhite,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: submitting ? 'default' : 'pointer',
+            opacity: submitting ? 0.6 : 1,
           }}
-        />
+        >
+          {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+        </button>
       </div>
-      <div>
-        <div style={fieldLabelStyle(palette)}>Password</div>
-        <input
-          type="password"
-          value={loginForm.password}
-          onChange={(e) => onChangePassword(e.target.value)}
-          placeholder="••••••••"
-          autoComplete="current-password"
-          style={{ ...fieldInputStyle(palette), padding: 11, background: palette.card }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onSignIn();
-          }}
-        />
-      </div>
-
-      {loginError && (
-        <div style={{ fontSize: 12.5, color: palette.rotate.bg, fontWeight: 600 }}>{loginError}</div>
-      )}
-
-      <button
-        type="button"
-        onClick={onSignIn}
-        style={{
-          border: 'none',
-          textAlign: 'center',
-          padding: '14px 0',
-          borderRadius: 12,
-          background: palette.dark,
-          color: palette.offwhite,
-          fontWeight: 700,
-          fontSize: 14,
-          cursor: 'pointer',
-        }}
-      >
-        Sign in
-      </button>
     </div>
   );
 }

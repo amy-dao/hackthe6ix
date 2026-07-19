@@ -26,7 +26,10 @@ import {
   fetchReference,
   identify as identifyApi,
   type IdentifyResult as ApiIdentifyResult,
+  login as loginApi,
+  setAuthToken,
   setFieldCrop,
+  signup as signupApi,
   syncField as syncFieldApi,
   updateField as updateFieldApi,
 } from './lib/api';
@@ -65,7 +68,9 @@ const EMPTY_ADD_FIELD_FORM: AddFieldForm = {
 };
 
 function readInitialSession() {
-  return loadSession();
+  const session = loadSession();
+  setAuthToken(session?.token ?? null);
+  return session;
 }
 
 export default function App() {
@@ -75,8 +80,11 @@ export default function App() {
   const [authed, setAuthed] = useState(Boolean(saved?.userName));
   const [introSeen, setIntroSeen] = useState(Boolean(saved?.introSeen));
   const [userName, setUserName] = useState(saved?.userName ?? '');
+  const [sessionToken, setSessionToken] = useState(saved?.token ?? '');
   const [loginForm, setLoginForm] = useState<LoginForm>({ name: saved?.userName ?? '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const [farm, setFarm] = useState<FarmState>(saved?.farm ?? EMPTY_FARM);
   const [drawMode, setDrawMode] = useState<DrawMode>('idle');
@@ -116,7 +124,9 @@ export default function App() {
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!authed) return;
     let cancelled = false;
+    setFieldsLoading(true);
     fetchFields()
       .then((data) => {
         if (cancelled) return;
@@ -131,12 +141,12 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authed]);
 
   useEffect(() => {
-    if (!authed || !userName) return;
-    saveSession({ userName, introSeen, farm });
-  }, [authed, userName, introSeen, farm]);
+    if (!authed || !userName || !sessionToken) return;
+    saveSession({ userName, token: sessionToken, introSeen, farm });
+  }, [authed, userName, sessionToken, introSeen, farm]);
 
   useEffect(() => {
     let cancelled = false;
@@ -210,32 +220,54 @@ export default function App() {
         : { eyebrow: 'Field Intelligence', title: 'Field' }
       : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
 
-  function signIn() {
-    if (!loginForm.name.trim() || !loginForm.password.trim()) {
-      setLoginError('Enter your name and password to continue.');
+  async function signIn() {
+    const username = loginForm.name.trim();
+    const password = loginForm.password;
+    if (!username || !password) {
+      setLoginError('Enter a username and password to continue.');
       return;
     }
-    const name = loginForm.name.trim();
-    setUserName(name);
-    setProfile((p) => ({ ...p, name }));
-    setAuthed(true);
+    setAuthSubmitting(true);
     setLoginError('');
-    if (!introSeen) {
-      setScreen('intro');
-    } else {
-      setScreen(farm.farmPolygon ? 'dashboard' : 'farmMap');
+    try {
+      const user = authMode === 'login' ? await loginApi(username, password) : await signupApi(username, password);
+      setAuthToken(user.token);
+      setUserName(user.username);
+      setSessionToken(user.token);
+      setProfile((p) => ({ ...p, name: user.username }));
+      setAuthed(true);
+      setFields([]);
+      if (!introSeen) {
+        setScreen('intro');
+      } else {
+        setScreen(farm.farmPolygon ? 'dashboard' : 'farmMap');
+      }
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Failed to sign in.');
+    } finally {
+      setAuthSubmitting(false);
     }
   }
 
+  function selectAuthMode(nextMode: 'login' | 'signup') {
+    setAuthMode(nextMode);
+    setLoginError('');
+  }
+
   function signOut() {
+    setAuthToken(null);
     setAuthed(false);
     setLoginForm({ name: '', password: '' });
     setLoginError('');
     setUserName('');
+    setSessionToken('');
     setIntroSeen(false);
     setFarm(EMPTY_FARM);
     setDrawMode('idle');
     setSelectedSubplotId(null);
+    setFields([]);
+    setFieldsLoading(true);
+    setFieldsError(null);
     clearSession();
   }
 
@@ -537,9 +569,12 @@ export default function App() {
             palette={palette}
             loginForm={loginForm}
             loginError={loginError}
+            mode={authMode}
+            submitting={authSubmitting}
             onChangeName={(name) => setLoginForm((s) => ({ ...s, name }))}
             onChangePassword={(password) => setLoginForm((s) => ({ ...s, password }))}
             onSignIn={signIn}
+            onSelectMode={selectAuthMode}
           />
         ) : screen === 'intro' ? (
           <IntroScreen palette={palette} userName={userName} onContinue={finishIntro} />

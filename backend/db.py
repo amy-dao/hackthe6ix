@@ -14,3 +14,6 @@ if not MONGODB_URI:
 client = MongoClient(MONGODB_URI, tlsCAFile=certifi.where())
 db = client.get_default_database("fieldintel")
 fields_collection = db["fields"]
+
+users_collection = db["users"]
+users_collection.create_index("username", unique=True)

@@ -93,3 +93,19 @@ class IdentifyResult(BaseModel):
     isWeed: bool
     reason: str
     confidence: str
+
+
+class SignupRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=40)
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: str
+    username: str
+    token: str
