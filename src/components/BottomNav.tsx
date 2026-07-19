@@ -22,7 +22,15 @@ const TABS: {
 
 export default function BottomNav({ palette, activeTab, onNavigate }: BottomNavProps) {
   return (
-    <div style={{ flexShrink: 0, display: 'flex', borderTop: '1px solid rgba(15,45,38,0.1)', background: palette.card }}>
+    <div
+      style={{
+        flexShrink: 0,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+        borderTop: '1px solid rgba(15,45,38,0.1)',
+        background: palette.card,
+      }}
+    >
       {TABS.map((tab) => {
         const color = activeTab === tab.key ? palette.accent : palette.muted;
         return (
@@ -30,7 +38,12 @@ export default function BottomNav({ palette, activeTab, onNavigate }: BottomNavP
             key={tab.key}
             onClick={() => onNavigate(tab.screen)}
             data-testid={`nav-${tab.key}`}
-            style={{ flex: 1, padding: '10px 0 12px', textAlign: 'center', cursor: 'pointer' }}
+            style={{
+              minWidth: 0,
+              padding: '10px 4px 12px',
+              textAlign: 'center',
+              cursor: 'pointer',
+            }}
           >
             <div
               style={{
@@ -49,7 +62,18 @@ export default function BottomNav({ palette, activeTab, onNavigate }: BottomNavP
                 boxSizing: 'border-box',
               }}
             />
-            <div style={{ fontSize: 10.5, fontWeight: 700, color }}>{tab.label}</div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {tab.label}
+            </div>
           </div>
         );
       })}

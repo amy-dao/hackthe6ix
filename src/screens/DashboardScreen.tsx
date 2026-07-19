@@ -88,7 +88,7 @@ export default function DashboardScreen({
           <div style={{ fontSize: 12, color: palette.muted }}>Your farm map</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>
             {farm.farmPolygon
-              ? `${farm.farmAreaAcres.toFixed(1)} ac · ${farm.subplots.length} subplot${farm.subplots.length === 1 ? '' : 's'}`
+              ? `${farm.farmAreaAcres.toFixed(1)} acres · ${farm.subplots.length} subplot${farm.subplots.length === 1 ? '' : 's'}`
               : 'Draw your farm boundary'}
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function DashboardScreen({
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: palette.dark }}>{f.name}</div>
                     <div style={{ fontSize: 11.5, color: palette.muted }}>
-                      {f.crop} · {f.acres} ac
+                      {f.crop} · {f.acres} acres
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>

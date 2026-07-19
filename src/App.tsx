@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   AddFieldForm,
   ColorMode,
-  CropRotationRecommendation,
+  CropEntryForm,
   DrawMode,
   FarmState,
   Field,
@@ -97,10 +97,7 @@ export default function App() {
 
   const [referenceCrops, setReferenceCrops] = useState<string[]>([]);
   const [referenceSoilTypes, setReferenceSoilTypes] = useState<string[]>([]);
-
-  const [recommendation, setRecommendation] = useState<CropRotationRecommendation | null>(null);
-  const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [focusSubplotId, setFocusSubplotId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,19 +128,12 @@ export default function App() {
         setReferenceSoilTypes(data.soilTypes);
       })
       .catch(() => {
-        /* dropdowns render empty; Save stays disabled until a crop/soil type is picked */
+        /* Local CROP_REFERENCE / SOIL_TYPES fill dropdowns when the API is offline. */
       });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (screen === 'recommendation' && !recommendation && !recommendationLoading) {
-      fetchRecommendation();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen]);
 
   const [inputMode, setInputMode] = useState<InputMode>('photo');
   const [captured, setCaptured] = useState(false);
@@ -179,7 +169,7 @@ export default function App() {
   const header =
     screen === 'detail'
       ? selectedField
-        ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} ac`, title: selectedField.name }
+        ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} acres`, title: selectedField.name }
         : { eyebrow: 'Field Intelligence', title: 'Field' }
       : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
 
@@ -255,7 +245,12 @@ export default function App() {
         acres: subplot.areaAcres,
         soilPh: subplot.data.soilPh === '' ? undefined : subplot.data.soilPh,
         soilType: subplot.data.soilType || undefined,
-        cropEntries: subplot.data.cropEntries,
+        cropEntries: subplot.data.cropEntries.map((e) => ({
+          ...e,
+          month: e.month || (e.startDate ? e.startDate.slice(0, 7) : ''),
+          startDate: e.startDate || '',
+          endDate: e.endDate || '',
+        })),
       });
       setFields((fs) => {
         const idx = fs.findIndex((f) => f.id === synced.id);
@@ -306,19 +301,28 @@ export default function App() {
   }
 
   function onAddCropEntry() {
-    setAddForm((s) => ({ ...s, cropEntries: [...s.cropEntries, { crop: '', month: '', isCurrent: false }] }));
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: [...s.cropEntries, { crop: '', month: '', startDate: '', endDate: '', isCurrent: false }],
+    }));
   }
 
   function onRemoveCropEntry(index: number) {
     setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.filter((_, i) => i !== index) }));
   }
 
-  function onChangeCropEntryCrop(index: number, crop: string) {
-    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, crop } : e)) }));
+  function onChangeCropEntryCrop(index: number, crop: string, meta?: CropEntryForm['meta']) {
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, crop, meta } : e)),
+    }));
   }
 
-  function onChangeCropEntryMonth(index: number, month: string) {
-    setAddForm((s) => ({ ...s, cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, month } : e)) }));
+  function onChangeCropEntryDates(index: number, dates: { startDate: string; endDate: string; month: string }) {
+    setAddForm((s) => ({
+      ...s,
+      cropEntries: s.cropEntries.map((e, i) => (i === index ? { ...e, ...dates } : e)),
+    }));
   }
 
   function onSetCurrentEntry(index: number) {
@@ -334,7 +338,9 @@ export default function App() {
     const phNum = Number(soilPh);
     const acresValid = acres.trim() !== '' && Number.isFinite(acresNum) && acresNum > 0;
     const phValid = soilPhUnknown || (soilPh.trim() !== '' && Number.isFinite(phNum) && phNum >= PH_MIN && phNum <= PH_MAX);
-    const entriesValid = cropEntries.every((e) => e.crop.trim() !== '' && e.month.trim() !== '');
+    const entriesValid = cropEntries.every(
+      (e) => e.crop.trim() !== '' && (e.startDate.trim() !== '' || e.month.trim() !== ''),
+    );
     const currentCount = cropEntries.filter((e) => e.isCurrent).length;
     if (!plotName.trim() || !soilType.trim() || !acresValid || !phValid || !entriesValid || currentCount > 1) return;
 
@@ -346,7 +352,12 @@ export default function App() {
         acres: acresNum,
         soilPh: soilPhUnknown ? undefined : phNum,
         soilType,
-        cropEntries,
+        cropEntries: cropEntries.map((e) => ({
+          ...e,
+          month: e.month || (e.startDate ? e.startDate.slice(0, 7) : ''),
+          startDate: e.startDate || '',
+          endDate: e.endDate || '',
+        })),
       });
       setFields((fs) => [...fs, created]);
       setScreen('dashboard');
@@ -365,30 +376,6 @@ export default function App() {
       back();
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : 'Failed to delete field.');
-    }
-  }
-
-  async function fetchRecommendation() {
-    setRecommendationLoading(true);
-    setRecommendationError(null);
-    try {
-      // TODO: replace with the real AI model call once the endpoint is available,
-      // e.g. const result = await getCropRotationRecommendation(selectedField?.id);
-      const result: CropRotationRecommendation = await new Promise((resolve) =>
-        setTimeout(
-          () =>
-            resolve({
-              recommendedCrop: 'Soybeans',
-              rotationDate: 'October 15, 2026',
-            }),
-          400,
-        ),
-      );
-      setRecommendation(result);
-    } catch (err) {
-      setRecommendationError(err instanceof Error ? err.message : 'Failed to load recommendation.');
-    } finally {
-      setRecommendationLoading(false);
     }
   }
 
@@ -453,7 +440,7 @@ export default function App() {
     runIdentify({ description: textQuery.trim() });
   }
 
-  const shellMaxWidth = screen === 'farmMap' || screen === 'dashboard' ? 720 : 480;
+  const shellMaxWidth = 760;
 
   return (
     <div
@@ -533,6 +520,9 @@ export default function App() {
                 <FieldsPage
                   palette={palette}
                   farm={farm}
+                  onUpdateSubplotData={handleUpdateSubplotData}
+                  focusSubplotId={focusSubplotId}
+                  onFocusSubplotConsumed={() => setFocusSubplotId(null)}
                   onOpenFarmMap={() => {
                     setDrawMode(farm.farmPolygon ? 'idle' : 'farm');
                     setScreen('farmMap');
@@ -597,10 +587,15 @@ export default function App() {
               {screen === 'recommendation' && (
                 <RecommendationScreen
                   palette={palette}
-                  recommendation={recommendation}
-                  loading={recommendationLoading}
-                  error={recommendationError}
-                  onRetry={fetchRecommendation}
+                  farm={farm}
+                  onOpenFarmMap={() => {
+                    setDrawMode(farm.farmPolygon ? 'idle' : 'farm');
+                    setScreen('farmMap');
+                  }}
+                  onOpenSubplot={(id) => {
+                    setFocusSubplotId(id);
+                    setScreen('dashboard');
+                  }}
                 />
               )}
 
@@ -622,7 +617,7 @@ export default function App() {
                   onAddCropEntry={onAddCropEntry}
                   onRemoveCropEntry={onRemoveCropEntry}
                   onChangeCropEntryCrop={onChangeCropEntryCrop}
-                  onChangeCropEntryMonth={onChangeCropEntryMonth}
+                  onChangeCropEntryDates={onChangeCropEntryDates}
                   onSetCurrentEntry={onSetCurrentEntry}
                   onSave={saveAddField}
                   onCancel={() => setScreen('dashboard')}

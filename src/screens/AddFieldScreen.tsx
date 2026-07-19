@@ -1,7 +1,8 @@
 import type { Palette } from '../palette';
-import type { AddFieldForm } from '../types';
+import type { AddFieldForm, CropEntryForm } from '../types';
 import { fieldLabelStyle, fieldInputStyle } from '../lib/formStyles';
 import { titleCase } from '../lib/fieldHelpers';
+import { resolveSoilTypeOptions } from '../lib/cropMetrics';
 import CropEntryEditor from '../components/CropEntryEditor';
 
 const PH_MIN = 3.5;
@@ -10,8 +11,8 @@ const PH_MAX = 9;
 interface AddFieldScreenProps {
   palette: Palette;
   form: AddFieldForm;
-  cropOptions: string[];
-  soilTypeOptions: string[];
+  cropOptions?: string[];
+  soilTypeOptions?: string[];
   saving?: boolean;
   error?: string | null;
   onChangePlotName: (value: string) => void;
@@ -21,8 +22,8 @@ interface AddFieldScreenProps {
   onChangeSoilType: (value: string) => void;
   onAddCropEntry: () => void;
   onRemoveCropEntry: (index: number) => void;
-  onChangeCropEntryCrop: (index: number, crop: string) => void;
-  onChangeCropEntryMonth: (index: number, month: string) => void;
+  onChangeCropEntryCrop: (index: number, crop: string, meta?: CropEntryForm['meta']) => void;
+  onChangeCropEntryDates: (index: number, dates: { startDate: string; endDate: string; month: string }) => void;
   onSetCurrentEntry: (index: number) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -35,8 +36,8 @@ function selectStyle(palette: Palette) {
 export default function AddFieldScreen({
   palette,
   form,
-  cropOptions,
-  soilTypeOptions,
+  cropOptions = [],
+  soilTypeOptions = [],
   saving = false,
   error = null,
   onChangePlotName,
@@ -47,18 +48,21 @@ export default function AddFieldScreen({
   onAddCropEntry,
   onRemoveCropEntry,
   onChangeCropEntryCrop,
-  onChangeCropEntryMonth,
+  onChangeCropEntryDates,
   onSetCurrentEntry,
   onSave,
   onCancel,
 }: AddFieldScreenProps) {
+  const soils = resolveSoilTypeOptions(soilTypeOptions);
   const acresValue = Number(form.acres);
   const acresValid = form.acres.trim() !== '' && Number.isFinite(acresValue) && acresValue > 0;
 
   const phValue = Number(form.soilPh);
   const phValid = form.soilPhUnknown || (form.soilPh.trim() !== '' && Number.isFinite(phValue) && phValue >= PH_MIN && phValue <= PH_MAX);
 
-  const entriesValid = form.cropEntries.every((e) => e.crop.trim() !== '' && e.month.trim() !== '');
+  const entriesValid = form.cropEntries.every(
+    (e) => e.crop.trim() !== '' && (e.startDate.trim() !== '' || e.month.trim() !== ''),
+  );
   const currentCount = form.cropEntries.filter((e) => e.isCurrent).length;
 
   const canSave =
@@ -125,9 +129,13 @@ export default function AddFieldScreen({
 
         <div>
           <div style={fieldLabelStyle(palette)}>Soil type</div>
-          <select value={form.soilType} onChange={(e) => onChangeSoilType(e.target.value)} style={selectStyle(palette)}>
+          <select
+            value={form.soilType === 'slit' ? 'silt' : form.soilType}
+            onChange={(e) => onChangeSoilType(e.target.value)}
+            style={selectStyle(palette)}
+          >
             <option value="">Select soil type…</option>
-            {soilTypeOptions.map((t) => (
+            {soils.map((t) => (
               <option key={t} value={t}>
                 {titleCase(t)}
               </option>
@@ -143,7 +151,7 @@ export default function AddFieldScreen({
         onAddCropEntry={onAddCropEntry}
         onRemoveCropEntry={onRemoveCropEntry}
         onChangeCropEntryCrop={onChangeCropEntryCrop}
-        onChangeCropEntryMonth={onChangeCropEntryMonth}
+        onChangeCropEntryDates={onChangeCropEntryDates}
         onSetCurrentEntry={onSetCurrentEntry}
       />
 

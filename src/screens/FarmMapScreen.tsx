@@ -173,7 +173,7 @@ export default function FarmMapScreen({
               {liveLabel}
             </div>
             <div style={{ fontSize: 20, fontWeight: 800, color: palette.dark }}>
-              {liveArea > 0 ? `${liveArea.toFixed(2)} ac` : '—'}
+              {liveArea > 0 ? `${liveArea.toFixed(2)} acres` : '—'}
             </div>
           </div>
           <div style={{ fontSize: 12, color: palette.muted, textAlign: 'right', lineHeight: 1.35 }}>
@@ -267,7 +267,7 @@ export default function FarmMapScreen({
               }}
             >
               <span style={{ width: 10, height: 10, borderRadius: 3, background: sp.color }} />
-              {sp.data.name || 'Field'} · {sp.areaAcres.toFixed(1)} ac
+              {sp.data.name || 'Field'} · {sp.areaAcres.toFixed(1)} acres
             </button>
           ))}
         </div>

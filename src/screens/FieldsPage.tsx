@@ -1,14 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Palette } from '../palette';
-import type { FarmState } from '../types';
+import type { FarmState, SubplotData } from '../types';
 import ViewToggle, { type FieldsViewMode } from '../components/fields/ViewToggle';
 import MainFieldMap from '../components/fields/MainFieldMap';
 import SubplotList from '../components/fields/SubplotList';
+import SubplotDetailPanel from '../components/fields/SubplotDetailPanel';
 
 interface FieldsPageProps {
   palette: Palette;
   farm: FarmState;
   onOpenFarmMap: () => void;
+  onUpdateSubplotData: (id: string, data: SubplotData) => void;
+  /** When set (e.g. from Recommend tab), open that subplot in the Subplots view. */
+  focusSubplotId?: string | null;
+  onFocusSubplotConsumed?: () => void;
 }
 
 function aggregateCrops(farm: FarmState): string {
@@ -27,9 +32,44 @@ function aggregateCrops(farm: FarmState): string {
   return names.join(', ');
 }
 
-export default function FieldsPage({ palette, farm, onOpenFarmMap }: FieldsPageProps) {
+export default function FieldsPage({
+  palette,
+  farm,
+  onOpenFarmMap,
+  onUpdateSubplotData,
+  focusSubplotId = null,
+  onFocusSubplotConsumed,
+}: FieldsPageProps) {
   const [view, setView] = useState<FieldsViewMode>('main');
+  const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
   const cropSummary = useMemo(() => aggregateCrops(farm), [farm]);
+
+  const selectedSubplot = useMemo(
+    () => farm.subplots.find((s) => s.id === selectedSubplotId) ?? null,
+    [farm.subplots, selectedSubplotId],
+  );
+
+  useEffect(() => {
+    if (selectedSubplotId && !farm.subplots.some((s) => s.id === selectedSubplotId)) {
+      setSelectedSubplotId(null);
+    }
+  }, [farm.subplots, selectedSubplotId]);
+
+  useEffect(() => {
+    if (!focusSubplotId) return;
+    if (!farm.subplots.some((s) => s.id === focusSubplotId)) {
+      onFocusSubplotConsumed?.();
+      return;
+    }
+    setView('subplots');
+    setSelectedSubplotId(focusSubplotId);
+    onFocusSubplotConsumed?.();
+  }, [focusSubplotId, farm.subplots, onFocusSubplotConsumed]);
+
+  function handleViewChange(next: FieldsViewMode) {
+    setView(next);
+    if (next === 'main') setSelectedSubplotId(null);
+  }
 
   if (!farm.farmPolygon) {
     return (
@@ -72,10 +112,10 @@ export default function FieldsPage({ palette, farm, onOpenFarmMap }: FieldsPageP
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minHeight: 0 }}>
-      <ViewToggle palette={palette} value={view} onChange={setView} />
+      <ViewToggle palette={palette} value={view} onChange={handleViewChange} />
 
       <div
-        key={view}
+        key={view === 'subplots' && selectedSubplot ? `detail-${selectedSubplot.id}` : view}
         style={{
           flex: 1,
           minHeight: 0,
@@ -112,7 +152,7 @@ export default function FieldsPage({ palette, farm, onOpenFarmMap }: FieldsPageP
                     Total farm area
                   </div>
                   <div style={{ fontSize: 26, fontWeight: 800, color: palette.dark, letterSpacing: '-0.02em' }}>
-                    {farm.farmAreaAcres.toFixed(2)} ac
+                    {farm.farmAreaAcres.toFixed(2)} acres
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -160,9 +200,25 @@ export default function FieldsPage({ palette, farm, onOpenFarmMap }: FieldsPageP
               Edit farm map
             </button>
           </>
+        ) : selectedSubplot ? (
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginRight: -4, paddingRight: 4 }}>
+            <SubplotDetailPanel
+              palette={palette}
+              subplot={selectedSubplot}
+              farmPolygon={farm.farmPolygon}
+              onChange={(data) => onUpdateSubplotData(selectedSubplot.id, data)}
+              onClose={() => setSelectedSubplotId(null)}
+            />
+          </div>
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginRight: -4, paddingRight: 4 }}>
-            <SubplotList palette={palette} farm={farm} onDrawSubplots={onOpenFarmMap} />
+            <SubplotList
+              palette={palette}
+              farm={farm}
+              selectedId={selectedSubplotId}
+              onSelect={setSelectedSubplotId}
+              onDrawSubplots={onOpenFarmMap}
+            />
           </div>
         )}
       </div>

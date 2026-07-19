@@ -5,10 +5,18 @@ import SubplotCard from './SubplotCard';
 interface SubplotListProps {
   palette: Palette;
   farm: FarmState;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   onDrawSubplots?: () => void;
 }
 
-export default function SubplotList({ palette, farm, onDrawSubplots }: SubplotListProps) {
+export default function SubplotList({
+  palette,
+  farm,
+  selectedId,
+  onSelect,
+  onDrawSubplots,
+}: SubplotListProps) {
   if (farm.subplots.length === 0) {
     return (
       <div
@@ -61,7 +69,14 @@ export default function SubplotList({ palette, farm, onDrawSubplots }: SubplotLi
       }}
     >
       {farm.subplots.map((sp) => (
-        <SubplotCard key={sp.id} palette={palette} subplot={sp} farmPolygon={farm.farmPolygon} />
+        <SubplotCard
+          key={sp.id}
+          palette={palette}
+          subplot={sp}
+          farmPolygon={farm.farmPolygon}
+          selected={selectedId === sp.id}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );

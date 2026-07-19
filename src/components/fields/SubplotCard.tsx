@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import type { Palette } from '../../palette';
 import type { LngLat, Subplot } from '../../types';
 import EllipsisMenu from './EllipsisMenu';
@@ -8,6 +8,8 @@ interface SubplotCardProps {
   palette: Palette;
   subplot: Subplot;
   farmPolygon?: LngLat[] | null;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 }
 
 function currentCropLabel(subplot: Subplot): string {
@@ -17,7 +19,13 @@ function currentCropLabel(subplot: Subplot): string {
   return any?.crop.trim() || 'No crop set';
 }
 
-export default function SubplotCard({ palette, subplot, farmPolygon }: SubplotCardProps) {
+export default function SubplotCard({
+  palette,
+  subplot,
+  farmPolygon,
+  selected = false,
+  onSelect,
+}: SubplotCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const card: CSSProperties = {
@@ -27,16 +35,41 @@ export default function SubplotCard({ palette, subplot, farmPolygon }: SubplotCa
     background: palette.card,
     borderRadius: 14,
     overflow: 'hidden',
-    border: `1.5px solid ${hovered ? 'rgba(15,45,38,0.18)' : 'rgba(15,45,38,0.08)'}`,
-    boxShadow: hovered ? '0 6px 18px rgba(15,45,38,0.1)' : 'none',
-    transform: hovered ? 'translateY(-1px)' : 'none',
+    border: selected
+      ? `2px solid ${palette.dark}`
+      : `1.5px solid ${hovered ? 'rgba(15,45,38,0.18)' : 'rgba(15,45,38,0.08)'}`,
+    boxShadow: selected
+      ? '0 8px 22px rgba(15,45,38,0.14)'
+      : hovered
+        ? '0 6px 18px rgba(15,45,38,0.1)'
+        : 'none',
+    transform: hovered || selected ? 'translateY(-1px)' : 'none',
     transition: 'box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease',
     position: 'relative',
+    cursor: onSelect ? 'pointer' : 'default',
+    outline: selected ? `2px solid ${subplot.color}` : 'none',
+    outlineOffset: 1,
   };
+
+  function handleActivate() {
+    onSelect?.(subplot.id);
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleActivate();
+    }
+  }
 
   return (
     <article
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
       style={card}
+      onClick={handleActivate}
+      onKeyDown={handleKeyDown}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -82,13 +115,14 @@ export default function SubplotCard({ palette, subplot, farmPolygon }: SubplotCa
           position: 'relative',
         }}
       >
-        <div style={{ position: 'absolute', top: 6, right: 6 }}>
+        <div
+          style={{ position: 'absolute', top: 6, right: 6 }}
+          onClick={(e: MouseEvent) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <EllipsisMenu
             palette={palette}
-            items={[
-              { label: 'Edit' },
-              { label: 'Predict' },
-            ]}
+            items={[{ label: 'Edit' }, { label: 'Predict' }]}
           />
         </div>
 

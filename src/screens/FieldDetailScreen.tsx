@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Palette } from '../palette';
 import type { Field } from '../types';
 import { statusMeta, cropIcon, titleCase } from '../lib/fieldHelpers';
 import { fieldLabelStyle, fieldInputStyle } from '../lib/formStyles';
+import { resolveCropOptions, resolveSoilTypeOptions } from '../lib/cropMetrics';
 
 const PH_MIN = 3.5;
 const PH_MAX = 9;
@@ -58,8 +59,8 @@ function selectStyle(palette: Palette) {
 export default function FieldDetailScreen({
   palette,
   field,
-  cropOptions,
-  soilTypeOptions,
+  cropOptions = [],
+  soilTypeOptions = [],
   editingCrop,
   actionMessage,
   onStartEditCrop,
@@ -76,6 +77,8 @@ export default function FieldDetailScreen({
   const [confirmingClearCrop, setConfirmingClearCrop] = useState(false);
   const [confirmingDeleteField, setConfirmingDeleteField] = useState(false);
   const [draft, setDraft] = useState<FieldDraft>(() => draftFromField(field));
+  const soils = useMemo(() => resolveSoilTypeOptions(soilTypeOptions), [soilTypeOptions]);
+  const crops = useMemo(() => resolveCropOptions(cropOptions), [cropOptions]);
 
   const meta = statusMeta(field.status, palette);
   const hasRecommendation = field.status === 'safe' || field.status === 'marginal' || field.status === 'rotate';
@@ -199,9 +202,13 @@ export default function FieldDetailScreen({
             </div>
             <div>
               <div style={fieldLabelStyle(palette)}>Soil type</div>
-              <select value={draft.soilType} onChange={(e) => setDraft((d) => ({ ...d, soilType: e.target.value }))} style={selectStyle(palette)}>
+              <select
+                value={draft.soilType === 'slit' ? 'silt' : draft.soilType}
+                onChange={(e) => setDraft((d) => ({ ...d, soilType: e.target.value }))}
+                style={selectStyle(palette)}
+              >
                 <option value="">Select soil type…</option>
-                {soilTypeOptions.map((t) => (
+                {soils.map((t) => (
                   <option key={t} value={t}>
                     {titleCase(t)}
                   </option>
@@ -324,7 +331,7 @@ export default function FieldDetailScreen({
                 What's planted now?
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {cropOptions.map((key) => {
+                {crops.map((key) => {
                   const label = titleCase(key);
                   const active = field.crop.toLowerCase() === key;
                   return (

@@ -40,7 +40,7 @@ export default function MapPopup({ palette, field, onClose, onViewDetails }: Map
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, color: palette.dark }}>{field.name}</div>
             <div style={{ fontSize: 12.5, color: palette.muted, marginTop: 2 }}>
-              {field.crop} · {field.acres} ac
+              {field.crop} · {field.acres} acres
             </div>
           </div>
           <div onClick={onClose} style={{ fontSize: 13, fontWeight: 700, color: palette.muted, cursor: 'pointer', padding: 2 }}>

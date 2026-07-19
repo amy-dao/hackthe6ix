@@ -3,7 +3,8 @@ import type { Palette } from '../../palette';
 import type { SubplotData } from '../../types';
 import { fieldLabelStyle, fieldInputStyle } from '../../lib/formStyles';
 import { titleCase } from '../../lib/fieldHelpers';
-import CropEntryEditor from '../CropEntryEditor';
+import { resolveSoilTypeOptions } from '../../lib/cropMetrics';
+import CropEntryEditor, { emptyCropEntry } from '../CropEntryEditor';
 
 const PH_MIN = 3.5;
 const PH_MAX = 9;
@@ -13,8 +14,8 @@ interface SubplotFormProps {
   data: SubplotData;
   areaAcres: number;
   color: string;
-  cropOptions: string[];
-  soilTypeOptions: string[];
+  cropOptions?: string[];
+  soilTypeOptions?: string[];
   saving?: boolean;
   syncError?: string | null;
   onChange: (next: SubplotData) => void;
@@ -29,8 +30,8 @@ export default function SubplotForm({
   data,
   areaAcres,
   color,
-  cropOptions,
-  soilTypeOptions,
+  cropOptions = [],
+  soilTypeOptions = [],
   saving = false,
   syncError = null,
   onChange,
@@ -49,6 +50,7 @@ export default function SubplotForm({
     boxShadow: '0 -8px 28px rgba(15,45,38,0.12)',
   };
 
+  const soils = resolveSoilTypeOptions(soilTypeOptions);
   const phValue = typeof data.soilPh === 'number' ? data.soilPh : Number(data.soilPh);
   const phValid = data.soilPh === '' || (Number.isFinite(phValue) && phValue >= PH_MIN && phValue <= PH_MAX);
   const canSave = data.name.trim().length > 0 && phValid && !saving;
@@ -66,7 +68,15 @@ export default function SubplotForm({
         <button
           type="button"
           onClick={onClose}
-          style={{ border: 'none', background: 'transparent', color: palette.muted, fontWeight: 700, fontSize: 13, cursor: 'pointer', padding: 4 }}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            color: palette.muted,
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            padding: 4,
+          }}
         >
           Close
         </button>
@@ -107,12 +117,12 @@ export default function SubplotForm({
       <div>
         <div style={fieldLabelStyle(palette)}>Soil type</div>
         <select
-          value={data.soilType}
+          value={data.soilType === 'slit' ? 'silt' : data.soilType}
           onChange={(e) => onChange({ ...data, soilType: e.target.value })}
           style={{ ...fieldInputStyle(palette), appearance: 'auto' as const, cursor: 'pointer' }}
         >
           <option value="">Select soil type…</option>
-          {soilTypeOptions.map((t) => (
+          {soils.map((t) => (
             <option key={t} value={t}>
               {titleCase(t)}
             </option>
@@ -126,24 +136,45 @@ export default function SubplotForm({
         helperText="A rotation recommendation needs both a current crop and at least one earlier one."
         cropOptions={cropOptions}
         entries={data.cropEntries}
-        onAddCropEntry={() => onChange({ ...data, cropEntries: [...data.cropEntries, { crop: '', month: '', isCurrent: false }] })}
-        onRemoveCropEntry={(i) => onChange({ ...data, cropEntries: data.cropEntries.filter((_, idx) => idx !== i) })}
-        onChangeCropEntryCrop={(i, crop) =>
-          onChange({ ...data, cropEntries: data.cropEntries.map((e, idx) => (idx === i ? { ...e, crop } : e)) })
+        onAddCropEntry={() =>
+          onChange({ ...data, cropEntries: [...data.cropEntries, emptyCropEntry()] })
         }
-        onChangeCropEntryMonth={(i, month) =>
-          onChange({ ...data, cropEntries: data.cropEntries.map((e, idx) => (idx === i ? { ...e, month } : e)) })
+        onRemoveCropEntry={(i) =>
+          onChange({ ...data, cropEntries: data.cropEntries.filter((_, idx) => idx !== i) })
+        }
+        onChangeCropEntryCrop={(i, crop, meta) =>
+          onChange({
+            ...data,
+            cropEntries: data.cropEntries.map((e, idx) => (idx === i ? { ...e, crop, meta } : e)),
+          })
+        }
+        onChangeCropEntryDates={(i, dates) =>
+          onChange({
+            ...data,
+            cropEntries: data.cropEntries.map((e, idx) => (idx === i ? { ...e, ...dates } : e)),
+          })
         }
         onSetCurrentEntry={(i) =>
           onChange({
             ...data,
-            cropEntries: data.cropEntries.map((e, idx) => ({ ...e, isCurrent: idx === i ? !e.isCurrent : false })),
+            cropEntries: data.cropEntries.map((e, idx) => ({
+              ...e,
+              isCurrent: idx === i ? !e.isCurrent : false,
+            })),
           })
         }
       />
 
       {syncError && (
-        <div style={{ fontSize: 12.5, color: palette.rotate.text, background: palette.rotate.bg, borderRadius: 10, padding: '10px 12px' }}>
+        <div
+          style={{
+            fontSize: 12.5,
+            color: palette.rotate.text,
+            background: palette.rotate.bg,
+            borderRadius: 10,
+            padding: '10px 12px',
+          }}
+        >
           {syncError}
         </div>
       )}
