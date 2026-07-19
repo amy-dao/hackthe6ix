@@ -95,7 +95,7 @@ function SubplotRecommendationCard({
                 whiteSpace: 'nowrap',
               }}
             >
-              {subplot.data.name || 'Subplot'}
+              {subplot.data.name || 'Field'}
             </div>
           </div>
           <div style={{ fontSize: 12.5, color: palette.muted, marginTop: 4, fontWeight: 600 }}>
@@ -274,7 +274,7 @@ export default function RecommendationScreen({
       <div style={{ textAlign: 'center', padding: '40px 16px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>Map your farm first</div>
         <div style={{ fontSize: 13, color: palette.muted, maxWidth: 280, lineHeight: 1.45 }}>
-          Draw a farm boundary and subplots to see rotation recommendations here.
+          Draw a farm boundary and fields to see rotation recommendations here.
         </div>
         {onOpenFarmMap && (
           <button type="button" onClick={onOpenFarmMap} style={{ border: 'none', borderRadius: 10, padding: '11px 18px', background: palette.dark, color: palette.offwhite, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -288,13 +288,13 @@ export default function RecommendationScreen({
   if (farm.subplots.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 16px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>No subplots yet</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>No fields yet</div>
         <div style={{ fontSize: 13, color: palette.muted, maxWidth: 280, lineHeight: 1.45 }}>
-          Add subplots on the map, then return here for per-plot rotation advice.
+          Add fields on the map, then return here for per-field rotation advice.
         </div>
         {onOpenFarmMap && (
           <button type="button" onClick={onOpenFarmMap} style={{ border: 'none', borderRadius: 10, padding: '11px 18px', background: palette.dark, color: palette.offwhite, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Draw subplots
+            Draw fields
           </button>
         )}
       </div>
@@ -305,17 +305,17 @@ export default function RecommendationScreen({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: palette.card, borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 12, color: palette.muted }}>Subplots to rotate</div>
+          <div style={{ fontSize: 12, color: palette.muted }}>Fields to rotate</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: palette.dark }}>{rotateCount}</div>
         </div>
         <div style={{ textAlign: 'right', fontSize: 12.5, color: palette.muted, fontWeight: 600 }}>
-          of {farm.subplots.length} subplot{farm.subplots.length === 1 ? '' : 's'}
+          of {farm.subplots.length} field{farm.subplots.length === 1 ? '' : 's'}
           {loading ? ' · scoring…' : ''}
         </div>
       </div>
 
       <div style={{ fontSize: 12.5, color: palette.muted, lineHeight: 1.4 }}>
-        Recommendations update automatically when subplot soil, crop, and area data are complete — no predict button needed.
+        Recommendations update automatically when field soil, crop, and area data are complete — no predict button needed.
       </div>
       {error && (
         <div style={{ fontSize: 12, color: palette.rotate?.text ?? '#8B3A2A', lineHeight: 1.4 }}>

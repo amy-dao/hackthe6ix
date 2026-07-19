@@ -18,3 +18,10 @@ fields_collection = db["fields"]
 users_collection = db["users"]
 users_collection.create_index("username", unique=True)
 users_collection.create_index("sessionToken")
+
+# One document per account: the full farm-map drawing (boundary + subplot
+# outlines + their form data), so a farmer doesn't have to redraw on a new
+# device/browser. Kept separate from fields_collection because it mirrors the
+# frontend's FarmState 1:1 rather than the agronomic Field schema.
+farm_state_collection = db["farm_state"]
+farm_state_collection.create_index("ownerId", unique=True)

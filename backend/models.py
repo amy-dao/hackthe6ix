@@ -90,6 +90,18 @@ class ReferenceOut(BaseModel):
     crops: list[str]
 
 
+class FarmStatePayload(BaseModel):
+    """The full farm-map drawing for one account: boundary polygon plus every
+    subplot outline and its form data. Subplots are stored as loose dicts
+    (not a typed model) so this endpoint doesn't have to be kept in lockstep
+    with the frontend's SubplotData shape — it's a cloud mirror of whatever
+    the client already round-trips through localStorage."""
+
+    farmPolygon: Optional[list[list[float]]] = None
+    farmAreaAcres: float = 0
+    subplots: list[dict] = []
+
+
 class IdentifyRequest(BaseModel):
     imageBase64: Optional[str] = None
     description: Optional[str] = None
@@ -141,11 +153,17 @@ class UserOut(BaseModel):
     id: str
     username: str
     token: str
+    farmerName: Optional[str] = None
+    farmName: Optional[str] = None
+    location: Optional[str] = None
 
 
 class UpdateAccountRequest(BaseModel):
     username: Optional[str] = Field(default=None, min_length=1, max_length=40)
     password: Optional[str] = None
+    farmerName: Optional[str] = None
+    farmName: Optional[str] = None
+    location: Optional[str] = None
 
 
 class PredictRequest(BaseModel):

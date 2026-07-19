@@ -1,16 +1,16 @@
 import type { Palette } from '../palette';
-import type { Field } from '../types';
-import { statusMeta } from '../lib/fieldHelpers';
+import type { Subplot } from '../types';
+import { currentCropLabel } from '../lib/fieldHelpers';
 
 interface MapPopupProps {
   palette: Palette;
-  field: Field;
+  subplot: Subplot;
   onClose: () => void;
   onViewDetails: () => void;
 }
 
-export default function MapPopup({ palette, field, onClose, onViewDetails }: MapPopupProps) {
-  const meta = statusMeta(field.status, palette);
+export default function MapPopup({ palette, subplot, onClose, onViewDetails }: MapPopupProps) {
+  const data = subplot.data;
   return (
     <div
       onClick={onClose}
@@ -21,6 +21,7 @@ export default function MapPopup({ palette, field, onClose, onViewDetails }: Map
         display: 'flex',
         alignItems: 'flex-end',
         zIndex: 30,
+        borderRadius: 16,
       }}
     >
       <div
@@ -29,39 +30,73 @@ export default function MapPopup({ palette, field, onClose, onViewDetails }: Map
           width: '100%',
           background: palette.card,
           borderRadius: '20px 20px 0 0',
-          padding: 20,
+          padding: 18,
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: palette.dark }}>{field.name}</div>
-            <div style={{ fontSize: 12.5, color: palette.muted, marginTop: 2 }}>
-              {field.crop} · {field.acres} acres
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: subplot.color, flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 17,
+                  fontWeight: 800,
+                  color: palette.dark,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {data.name || 'Field'}
+              </div>
+              <div style={{ fontSize: 12.5, color: palette.muted, marginTop: 2 }}>
+                {subplot.areaAcres.toFixed(2)} acres · {currentCropLabel(subplot)}
+              </div>
             </div>
           </div>
-          <div onClick={onClose} style={{ fontSize: 13, fontWeight: 700, color: palette.muted, cursor: 'pointer', padding: 2 }}>
+          <div onClick={onClose} style={{ fontSize: 13, fontWeight: 700, color: palette.muted, cursor: 'pointer', padding: 2, flexShrink: 0 }}>
             Close
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: '5px 10px',
-              borderRadius: 20,
-              background: meta.bg,
-              color: meta.text,
-            }}
-          >
-            {meta.label}
+
+        {(data.soilType || data.soilPh !== '') && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {data.soilType && (
+              <div
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  padding: '5px 10px',
+                  borderRadius: 20,
+                  background: 'rgba(15,45,38,0.06)',
+                  color: palette.dark,
+                  textTransform: 'capitalize',
+                }}
+              >
+                {data.soilType}
+              </div>
+            )}
+            {data.soilPh !== '' && (
+              <div
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  padding: '5px 10px',
+                  borderRadius: 20,
+                  background: 'rgba(15,45,38,0.06)',
+                  color: palette.dark,
+                }}
+              >
+                pH {data.soilPh}
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 12.5, color: palette.muted, fontWeight: 600 }}>Risk {field.risk}</div>
-        </div>
+        )}
+
         <div
           onClick={onViewDetails}
           style={{
@@ -75,7 +110,7 @@ export default function MapPopup({ palette, field, onClose, onViewDetails }: Map
             cursor: 'pointer',
           }}
         >
-          View full details
+          View / edit field
         </div>
       </div>
     </div>

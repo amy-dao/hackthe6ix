@@ -139,7 +139,7 @@ function DrawingController({
           return;
         }
         if (!isPointInside(farmPolygon, pt) && !(draft.length >= 3 && isNearStart(draft, pt))) {
-          onDrawError('Subplots must stay inside the farm boundary.');
+          onDrawError('Fields must stay inside the farm boundary.');
           return;
         }
       }

@@ -49,8 +49,7 @@ export type Screen =
   | 'recommendation'
   | 'profile'
   | 'addField'
-  | 'farmMap'
-  | 'intro';
+  | 'farmMap';
  
 export type DashboardView = 'cards' | 'map';
  
@@ -97,7 +96,6 @@ export interface FarmState {
 export interface PersistedSession {
   userName: string;
   token: string;
-  introSeen: boolean;
   farm: FarmState;
 }
  

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { Palette } from '../../palette';
 import type { LngLat, Subplot } from '../../types';
+import { currentCropLabel } from '../../lib/fieldHelpers';
 import SubplotMiniMap from './SubplotMiniMap';
 
 interface SubplotCardProps {
@@ -9,13 +10,6 @@ interface SubplotCardProps {
   farmPolygon?: LngLat[] | null;
   selected?: boolean;
   onSelect?: (id: string) => void;
-}
-
-function currentCropLabel(subplot: Subplot): string {
-  const current = subplot.data.cropEntries.find((e) => e.isCurrent && e.crop.trim());
-  if (current) return current.crop.trim();
-  const any = subplot.data.cropEntries.find((e) => e.crop.trim());
-  return any?.crop.trim() || 'No crop set';
 }
 
 export default function SubplotCard({
@@ -123,7 +117,7 @@ export default function SubplotCard({
             textOverflow: 'ellipsis',
           }}
         >
-          {subplot.data.name || 'Subplot'}
+          {subplot.data.name || 'Field'}
         </div>
         <div style={{ fontSize: 18, fontWeight: 800, color: palette.dark, letterSpacing: '-0.02em' }}>
           {subplot.areaAcres.toFixed(2)} acres

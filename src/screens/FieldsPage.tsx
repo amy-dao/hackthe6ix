@@ -6,6 +6,7 @@ import MainFieldMap from '../components/fields/MainFieldMap';
 import SubplotList from '../components/fields/SubplotList';
 import SubplotDetailPanel from '../components/fields/SubplotDetailPanel';
 import YearlyWeatherChart from '../components/fields/YearlyWeatherChart';
+import MapPopup from '../components/MapPopup';
 import { farmLocationFromGeometry } from '../lib/farmLocation';
 import { fetchMonthlyClimate, type MonthlyClimate } from '../lib/weather';
 
@@ -44,6 +45,7 @@ export default function FieldsPage({
 }: FieldsPageProps) {
   const [view, setView] = useState<FieldsViewMode>('main');
   const [selectedSubplotId, setSelectedSubplotId] = useState<string | null>(null);
+  const [mapPopupId, setMapPopupId] = useState<string | null>(null);
   const [climate, setClimate] = useState<MonthlyClimate[] | null>(null);
   const [climateError, setClimateError] = useState<string | null>(null);
   const [climateLoading, setClimateLoading] = useState(false);
@@ -93,6 +95,11 @@ export default function FieldsPage({
     [farm.subplots, selectedSubplotId],
   );
 
+  const mapPopupSubplot = useMemo(
+    () => farm.subplots.find((s) => s.id === mapPopupId) ?? null,
+    [farm.subplots, mapPopupId],
+  );
+
   useEffect(() => {
     if (selectedSubplotId && !farm.subplots.some((s) => s.id === selectedSubplotId)) {
       setSelectedSubplotId(null);
@@ -100,12 +107,18 @@ export default function FieldsPage({
   }, [farm.subplots, selectedSubplotId]);
 
   useEffect(() => {
+    if (mapPopupId && !farm.subplots.some((s) => s.id === mapPopupId)) {
+      setMapPopupId(null);
+    }
+  }, [farm.subplots, mapPopupId]);
+
+  useEffect(() => {
     if (!focusSubplotId) return;
     if (!farm.subplots.some((s) => s.id === focusSubplotId)) {
       onFocusSubplotConsumed?.();
       return;
     }
-    setView('subplots');
+    setView('fields');
     setSelectedSubplotId(focusSubplotId);
     onFocusSubplotConsumed?.();
   }, [focusSubplotId, farm.subplots, onFocusSubplotConsumed]);
@@ -113,6 +126,13 @@ export default function FieldsPage({
   function handleViewChange(next: FieldsViewMode) {
     setView(next);
     if (next === 'main') setSelectedSubplotId(null);
+    else setMapPopupId(null);
+  }
+
+  function openFieldFromMap(id: string) {
+    setMapPopupId(null);
+    setSelectedSubplotId(id);
+    setView('fields');
   }
 
   if (!farm.farmPolygon) {
@@ -131,7 +151,7 @@ export default function FieldsPage({
       >
         <div style={{ fontSize: 18, fontWeight: 800, color: palette.dark }}>Map your farm</div>
         <div style={{ fontSize: 13.5, color: palette.muted, lineHeight: 1.5, maxWidth: 300 }}>
-          Draw your main farm boundary and subplots to see them organized here.
+          Draw your farm boundary and fields to see them organized here.
         </div>
         <button
           type="button"
@@ -159,7 +179,7 @@ export default function FieldsPage({
       <ViewToggle palette={palette} value={view} onChange={handleViewChange} />
 
       <div
-        key={view === 'subplots' && selectedSubplot ? `detail-${selectedSubplot.id}` : view}
+        key={view === 'fields' && selectedSubplot ? `detail-${selectedSubplot.id}` : view}
         style={{
           flex: 1,
           minHeight: 0,
@@ -201,7 +221,7 @@ export default function FieldsPage({
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: palette.muted }}>Subplots</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: palette.muted }}>Fields</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: palette.dark }}>{farm.subplots.length}</div>
                 </div>
               </div>
@@ -227,6 +247,23 @@ export default function FieldsPage({
               )}
             </div>
 
+            <div style={{ flex: 1, minHeight: 240, position: 'relative' }}>
+              <MainFieldMap
+                farm={farm}
+                height="100%"
+                selectedFieldId={mapPopupId}
+                onSelectField={setMapPopupId}
+              />
+              {mapPopupSubplot && (
+                <MapPopup
+                  palette={palette}
+                  subplot={mapPopupSubplot}
+                  onClose={() => setMapPopupId(null)}
+                  onViewDetails={() => openFieldFromMap(mapPopupSubplot.id)}
+                />
+              )}
+            </div>
+
             {climateLoading && (
               <div style={{ fontSize: 12.5, color: palette.muted, fontStyle: 'italic' }}>Loading climate normals…</div>
             )}
@@ -234,10 +271,6 @@ export default function FieldsPage({
               <div style={{ fontSize: 12.5, color: palette.rotate?.bg ?? '#C0392B' }}>{climateError}</div>
             )}
             {climate && <YearlyWeatherChart palette={palette} months={climate} locationLabel={locationLabel} />}
-
-            <div style={{ flex: 1, minHeight: 240 }}>
-              <MainFieldMap farm={farm} height="100%" />
-            </div>
 
             <button
               type="button"

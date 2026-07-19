@@ -16,18 +16,21 @@ import type {
   SubplotData,
 } from './types';
 import { palettes } from './palette';
-import { EMPTY_FARM, loadSession, saveSession, clearSession } from './lib/storage';
+import { EMPTY_FARM, loadSession, saveSession } from './lib/storage';
 import {
   addField as addFieldApi,
   clearFieldCrop,
   deleteField as deleteFieldApi,
+  fetchFarmState,
   fetchFields,
   fetchReference,
   identify as identifyApi,
   type IdentifyResult as ApiIdentifyResult,
   login as loginApi,
   predictRecommendation,
+  saveFarmState,
   setAuthToken,
+  setUnauthorizedHandler,
   setFieldCrop,
   syncField as syncFieldApi,
   updateAccount as updateAccountApi,
@@ -36,7 +39,6 @@ import {
 import { subplotToPredictPayload } from './lib/mlPredict';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
-import IntroScreen from './screens/IntroScreen';
 import FarmMapScreen from './screens/FarmMapScreen';
 import FieldsPage from './screens/FieldsPage';
 import FieldDetailScreen from './screens/FieldDetailScreen';
@@ -45,7 +47,7 @@ import AddFieldScreen from './screens/AddFieldScreen';
 import RecommendationScreen from './screens/CropRecommendationScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
-const HEADER_MAP: Record<Exclude<Screen, 'detail' | 'intro'>, { eyebrow: string; title: string }> = {
+const HEADER_MAP: Record<Exclude<Screen, 'detail'>, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: 'Field Intelligence', title: 'Your Fields' },
   camera: { eyebrow: 'Field Intelligence', title: 'Identify' },
   recommendation: { eyebrow: 'Field Intelligence', title: 'Recommendation' },
@@ -82,7 +84,6 @@ export default function App() {
 
   const colorMode: ColorMode = 'traffic-light';
   const [authed, setAuthed] = useState(Boolean(saved?.userName));
-  const [introSeen, setIntroSeen] = useState(Boolean(saved?.introSeen));
   const [userName, setUserName] = useState(saved?.userName ?? '');
   const [sessionToken, setSessionToken] = useState(saved?.token ?? '');
   const [autoLoginError, setAutoLoginError] = useState('');
@@ -95,7 +96,9 @@ export default function App() {
   const [drawError, setDrawError] = useState<string | null>(null);
   const [syncingSubplotId, setSyncingSubplotId] = useState<string | null>(null);
   const [subplotSyncError, setSubplotSyncError] = useState<string | null>(null);
+  const [farmHydrated, setFarmHydrated] = useState(false);
   const inferTimers = useRef<Record<string, number>>({});
+  const farmSyncTimer = useRef<number | undefined>(undefined);
   const farmRef = useRef(farm);
   farmRef.current = farm;
 
@@ -103,9 +106,7 @@ export default function App() {
     if (drawMode !== 'edit') setEditTarget(null);
   }, [drawMode]);
 
-  const [screen, setScreen] = useState<Screen>(
-    saved?.userName ? (saved.introSeen ? (saved.farm.farmPolygon ? 'dashboard' : 'farmMap') : 'intro') : 'dashboard',
-  );
+  const [screen, setScreen] = useState<Screen>('dashboard');
   const [selectedFieldId, setSelectedFieldId] = useState('');
   const [fields, setFields] = useState<Field[]>([]);
   const [editingCrop, setEditingCrop] = useState(false);
@@ -119,6 +120,18 @@ export default function App() {
   const [referenceSoilTypes, setReferenceSoilTypes] = useState<string[]>([]);
   const [focusSubplotId, setFocusSubplotId] = useState<string | null>(null);
 
+  // If a request ever comes back 401 (e.g. this shared account logged in
+  // elsewhere and issued a fresh session token), silently flip `authed` off
+  // so the effect below re-authenticates — no visible sign-out, and no farm
+  // or profile state is touched, so nothing on screen is lost.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setAuthToken(null);
+      setAuthed(false);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   useEffect(() => {
     if (authed) return;
     let cancelled = false;
@@ -129,11 +142,11 @@ export default function App() {
         setUserName(user.username);
         setSessionToken(user.token);
         setAuthed(true);
-        if (!introSeen) {
-          setScreen('intro');
-        } else {
-          setScreen(farm.farmPolygon ? 'dashboard' : 'farmMap');
-        }
+        setProfile((p) => ({
+          name: user.farmerName || p.name,
+          farmName: user.farmName || p.farmName,
+          location: user.location || p.location,
+        }));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -163,8 +176,49 @@ export default function App() {
 
   useEffect(() => {
     if (!authed || !userName || !sessionToken) return;
-    saveSession({ userName, token: sessionToken, introSeen, farm });
-  }, [authed, userName, sessionToken, introSeen, farm]);
+    saveSession({ userName, token: sessionToken, farm });
+  }, [authed, userName, sessionToken, farm]);
+
+  // Cross-device recovery: if this browser has no drawn farm locally, pull
+  // whatever was last autosaved to the account instead of forcing a redraw.
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    fetchFarmState()
+      .then((remote) => {
+        if (cancelled) return;
+        if (remote?.farmPolygon && !saved?.farm?.farmPolygon) {
+          setFarm(remote);
+        }
+      })
+      .catch(() => {
+        /* offline, or nothing synced yet for this account */
+      })
+      .finally(() => {
+        if (!cancelled) setFarmHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed]);
+
+  // Autosync: debounce the farm drawing (boundary + subplot outlines/data)
+  // up to the account so it survives switching devices/browsers. Gated on
+  // farmHydrated so this can't fire — and overwrite real backend data with
+  // an empty/local farm — before the recovery fetch above has resolved.
+  useEffect(() => {
+    if (!authed || !farmHydrated) return;
+    if (farmSyncTimer.current) window.clearTimeout(farmSyncTimer.current);
+    farmSyncTimer.current = window.setTimeout(() => {
+      saveFarmState(farm).catch(() => {
+        /* offline — localStorage already has the latest drawing */
+      });
+    }, 800);
+    return () => {
+      if (farmSyncTimer.current) window.clearTimeout(farmSyncTimer.current);
+    };
+  }, [authed, farmHydrated, farm]);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,9 +284,15 @@ export default function App() {
       ? selectedField
         ? { eyebrow: `${selectedField.crop} · ${selectedField.acres} acres`, title: selectedField.name }
         : { eyebrow: 'Field Intelligence', title: 'Field' }
-      : HEADER_MAP[screen as Exclude<Screen, 'detail' | 'intro'>];
+      : HEADER_MAP[screen as Exclude<Screen, 'detail'>];
 
-  async function updateAccount(updates: { username?: string; password?: string }) {
+  async function updateAccount(updates: {
+    username?: string;
+    password?: string;
+    farmerName?: string;
+    farmName?: string;
+    location?: string;
+  }) {
     setAccountSaving(true);
     setAccountError('');
     try {
@@ -240,32 +300,16 @@ export default function App() {
       setAuthToken(user.token);
       setSessionToken(user.token);
       setUserName(user.username);
+      setProfile((p) => ({
+        name: user.farmerName ?? p.name,
+        farmName: user.farmName ?? p.farmName,
+        location: user.location ?? p.location,
+      }));
     } catch (err) {
       setAccountError(err instanceof Error ? err.message : 'Failed to update account.');
     } finally {
       setAccountSaving(false);
     }
-  }
-
-  function signOut() {
-    setAuthToken(null);
-    setAuthed(false);
-    setAutoLoginError('');
-    setUserName('');
-    setSessionToken('');
-    setIntroSeen(false);
-    setFarm(EMPTY_FARM);
-    setDrawMode('idle');
-    setSelectedSubplotId(null);
-    setFields([]);
-    setAccountError('');
-    clearSession();
-  }
-
-  function finishIntro() {
-    setIntroSeen(true);
-    setScreen('farmMap');
-    if (!farm.farmPolygon) setDrawMode('farm');
   }
 
   function handleFarmComplete(coords: LngLat[], acres: number) {
@@ -633,8 +677,6 @@ export default function App() {
               <div style={{ color: palette.muted, fontSize: 13.5 }}>Loading…</div>
             )}
           </div>
-        ) : screen === 'intro' ? (
-          <IntroScreen palette={palette} userName={userName} onContinue={finishIntro} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%' }}>
             <Header palette={palette} eyebrow={header.eyebrow} title={header.title} showBack={showBack} onBack={back} />
@@ -813,7 +855,6 @@ export default function App() {
                   accountError={accountError}
                   onChangeField={(field, value) => setProfile((s) => ({ ...s, [field]: value }))}
                   onUpdateAccount={updateAccount}
-                  onSignOut={signOut}
                 />
               )}
             </div>

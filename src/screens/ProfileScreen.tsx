@@ -10,8 +10,13 @@ interface ProfileScreenProps {
   accountSaving: boolean;
   accountError: string;
   onChangeField: (field: keyof Profile, value: string) => void;
-  onUpdateAccount: (updates: { username?: string; password?: string }) => void;
-  onSignOut: () => void;
+  onUpdateAccount: (updates: {
+    username?: string;
+    password?: string;
+    farmerName?: string;
+    farmName?: string;
+    location?: string;
+  }) => void;
 }
 
 export default function ProfileScreen({
@@ -22,7 +27,6 @@ export default function ProfileScreen({
   accountError,
   onChangeField,
   onUpdateAccount,
-  onSignOut,
 }: ProfileScreenProps) {
   const [newUsername, setNewUsername] = useState(username);
   const [newPassword, setNewPassword] = useState('');
@@ -39,6 +43,14 @@ export default function ProfileScreen({
     if (!updates.username && !updates.password) return;
     onUpdateAccount(updates);
     setNewPassword('');
+  }
+
+  function handleSaveProfile() {
+    onUpdateAccount({
+      farmerName: profile.name.trim(),
+      farmName: profile.farmName.trim(),
+      location: profile.location.trim(),
+    });
   }
 
   return (
@@ -60,6 +72,23 @@ export default function ProfileScreen({
             placeholder="County, state or GPS coordinates"
             style={fieldInputStyle(palette)}
           />
+        </div>
+
+        <div
+          onClick={accountSaving ? undefined : handleSaveProfile}
+          style={{
+            textAlign: 'center',
+            padding: '12px 0',
+            borderRadius: 12,
+            background: palette.dark,
+            color: palette.offwhite,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: accountSaving ? 'default' : 'pointer',
+            opacity: accountSaving ? 0.6 : 1,
+          }}
+        >
+          {accountSaving ? 'Saving…' : 'Save profile'}
         </div>
       </div>
 
@@ -106,23 +135,6 @@ export default function ProfileScreen({
         >
           {accountSaving ? 'Saving…' : 'Save account changes'}
         </div>
-      </div>
-
-      <div
-        onClick={onSignOut}
-        style={{
-          textAlign: 'center',
-          padding: '13px 0',
-          borderRadius: 12,
-          background: 'transparent',
-          border: `1.5px solid ${palette.rotate.bg}`,
-          color: palette.rotate.bg,
-          fontWeight: 700,
-          fontSize: 14,
-          cursor: 'pointer',
-        }}
-      >
-        Sign out
       </div>
     </div>
   );

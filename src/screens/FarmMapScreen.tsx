@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { DrawMode, EditTarget, FarmState, LngLat, Subplot, SubplotData } from '../types';
 import type { Palette } from '../palette';
 import InteractiveFarmMap from '../components/map/InteractiveFarmMap';
@@ -35,6 +35,8 @@ interface FarmMapScreenProps {
   onEditSubplot: (id: string, coords: LngLat[], areaAcres: number) => void;
 }
 
+type MapStep = 'farm' | 'fields';
+
 function ToolButton({
   label,
   active,
@@ -62,6 +64,28 @@ function ToolButton({
   };
   return (
     <button type="button" disabled={disabled} onClick={onClick} style={style}>
+      {label}
+    </button>
+  );
+}
+
+function TextLinkButton({ label, palette, onClick }: { label: string; palette: Palette; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: 'none',
+        background: 'transparent',
+        color: palette.muted,
+        fontWeight: 700,
+        fontSize: 12.5,
+        cursor: 'pointer',
+        padding: '10px 4px',
+        whiteSpace: 'nowrap',
+        fontFamily: 'inherit',
+      }}
+    >
       {label}
     </button>
   );
@@ -97,16 +121,19 @@ export default function FarmMapScreen({
   onEditFarmBoundary,
   onEditSubplot,
 }: FarmMapScreenProps) {
+  const [mapStep, setMapStep] = useState<MapStep>(() => (farm.farmPolygon ? 'fields' : 'farm'));
+
   const selected = farm.subplots.find((s) => s.id === selectedSubplotId) ?? null;
   const drawing = drawMode === 'farm' || drawMode === 'subplot';
   const editing = drawMode === 'edit' && editTarget !== null;
+  const editingFarmBoundary = editing && editTarget?.type === 'farm';
   const editingSubplot = editing && editTarget?.type === 'subplot' ? farm.subplots.find((s) => s.id === editTarget.id) ?? null : null;
   const liveArea =
     drawing && draftAreaAcres > 0
       ? draftAreaAcres
       : editingSubplot
         ? editingSubplot.areaAcres
-        : editing && editTarget?.type === 'farm'
+        : editingFarmBoundary
           ? farm.farmAreaAcres
           : selected
             ? selected.areaAcres
@@ -114,17 +141,43 @@ export default function FarmMapScreen({
 
   const liveLabel = drawing
     ? drawMode === 'farm'
-      ? 'Farm (drawing)'
+      ? 'Farm boundary (drawing)'
       : 'Field (drawing)'
     : editingSubplot
       ? `${editingSubplot.data.name || 'Field'} (editing)`
-      : editing && editTarget?.type === 'farm'
-        ? 'Farm (editing)'
+      : editingFarmBoundary
+        ? 'Farm boundary (editing)'
         : selected
           ? selected.data.name || 'Field'
           : farm.farmPolygon
             ? 'Farm total'
             : 'Area';
+
+  function goToFarmStep() {
+    onDrawError(null);
+    onSelectSubplot(null);
+    onSetDrawMode('idle');
+    setMapStep('farm');
+  }
+
+  function goToFieldsStep() {
+    if (!farm.farmPolygon) return;
+    onDrawError(null);
+    onSetDrawMode('idle');
+    setMapStep('fields');
+  }
+
+  function toggleEditFarmBoundary() {
+    if (editingFarmBoundary) onFinishEditing();
+    else onStartEditFarmBoundary();
+  }
+
+  function clearFarmWithConfirm() {
+    if (window.confirm('Clear the farm boundary and all fields?')) {
+      onClearFarm();
+      setMapStep('farm');
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 0 }}>
@@ -137,56 +190,73 @@ export default function FarmMapScreen({
           paddingBottom: 12,
         }}
       >
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-          <ToolButton
-            palette={palette}
-            label={farm.farmPolygon ? 'Redraw farm' : 'Draw farm'}
-            active={drawMode === 'farm'}
-            onClick={() => {
-              onDrawError(null);
-              onSelectSubplot(null);
-              onSetDrawMode(drawMode === 'farm' ? 'idle' : 'farm');
-            }}
-          />
-          <ToolButton
-            palette={palette}
-            label="Draw field"
-            active={drawMode === 'subplot'}
-            disabled={!farm.farmPolygon}
-            onClick={() => {
-              onDrawError(null);
-              onSelectSubplot(null);
-              onSetDrawMode(drawMode === 'subplot' ? 'idle' : 'subplot');
-            }}
-          />
-          <ToolButton
-            palette={palette}
-            label="Select"
-            active={drawMode === 'idle' || drawMode === 'edit'}
-            onClick={() => {
-              onDrawError(null);
-              onSetDrawMode('idle');
-            }}
-          />
-          {farm.farmPolygon && (
-            <ToolButton
-              palette={palette}
-              label="Edit boundary"
-              active={editing && editTarget?.type === 'farm'}
-              onClick={() => {
-                if (editing && editTarget?.type === 'farm') onFinishEditing();
-                else onStartEditFarmBoundary();
-              }}
-            />
-          )}
-          {farm.farmPolygon && (
-            <ToolButton
-              palette={palette}
-              label="Clear farm"
-              onClick={() => {
-                if (window.confirm('Clear the farm boundary and all subplots?')) onClearFarm();
-              }}
-            />
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: palette.muted,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+          }}
+        >
+          Step {mapStep === 'farm' ? '1' : '2'} of 2 · {mapStep === 'farm' ? 'Farm boundary' : 'Fields'}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+          {mapStep === 'farm' ? (
+            <>
+              <ToolButton
+                palette={palette}
+                label={farm.farmPolygon ? 'Redraw farm boundary' : 'Draw farm boundary'}
+                active={drawMode === 'farm'}
+                onClick={() => {
+                  onDrawError(null);
+                  onSelectSubplot(null);
+                  onSetDrawMode(drawMode === 'farm' ? 'idle' : 'farm');
+                }}
+              />
+              {farm.farmPolygon && (
+                <ToolButton
+                  palette={palette}
+                  label="Edit boundary"
+                  active={editingFarmBoundary}
+                  onClick={toggleEditFarmBoundary}
+                />
+              )}
+              {farm.farmPolygon && <TextLinkButton palette={palette} label="Clear farm" onClick={clearFarmWithConfirm} />}
+            </>
+          ) : (
+            <>
+              <TextLinkButton palette={palette} label="← Farm boundary" onClick={goToFarmStep} />
+              <ToolButton
+                palette={palette}
+                label="Draw field"
+                active={drawMode === 'subplot'}
+                onClick={() => {
+                  onDrawError(null);
+                  onSelectSubplot(null);
+                  onSetDrawMode(drawMode === 'subplot' ? 'idle' : 'subplot');
+                }}
+              />
+              <ToolButton
+                palette={palette}
+                label="Edit farm boundary"
+                active={editingFarmBoundary}
+                onClick={toggleEditFarmBoundary}
+              />
+              {selected && (
+                <ToolButton
+                  palette={palette}
+                  label="Edit field boundary"
+                  active={Boolean(editingSubplot && editingSubplot.id === selected.id)}
+                  onClick={() => {
+                    if (editingSubplot && editingSubplot.id === selected.id) onFinishEditing();
+                    else onStartEditSubplot(selected.id);
+                  }}
+                />
+              )}
+              <TextLinkButton palette={palette} label="Clear farm" onClick={clearFarmWithConfirm} />
+            </>
           )}
         </div>
 
@@ -222,12 +292,14 @@ export default function FarmMapScreen({
                 <br />
                 Tap a point to remove it.
               </>
-            ) : farm.farmPolygon ? (
+            ) : mapStep === 'fields' && farm.farmPolygon ? (
               <>
                 {farm.subplots.length} field{farm.subplots.length === 1 ? '' : 's'}
                 <br />
-                Tap a plot to edit data
+                Tap a field to edit data
               </>
+            ) : farm.farmPolygon ? (
+              'Boundary set — edit it or continue'
             ) : (
               'Start by drawing your farm boundary'
             )}
@@ -279,7 +351,7 @@ export default function FarmMapScreen({
         />
       </div>
 
-      {farm.subplots.length > 0 && !selected && (
+      {mapStep === 'fields' && farm.subplots.length > 0 && !selected && (
         <div
           style={{
             flexShrink: 0,
@@ -371,10 +443,11 @@ export default function FarmMapScreen({
         </button>
       )}
 
-      {farm.farmPolygon && !selected && !drawing && !editing && (
+      {!selected && !drawing && !editing && (
         <button
           type="button"
-          onClick={onDone}
+          onClick={mapStep === 'farm' ? goToFieldsStep : onDone}
+          disabled={mapStep === 'farm' && !farm.farmPolygon}
           style={{
             flexShrink: 0,
             marginTop: 12,
@@ -385,10 +458,11 @@ export default function FarmMapScreen({
             color: palette.offwhite,
             fontWeight: 700,
             fontSize: 14,
-            cursor: 'pointer',
+            cursor: mapStep === 'farm' && !farm.farmPolygon ? 'default' : 'pointer',
+            opacity: mapStep === 'farm' && !farm.farmPolygon ? 0.45 : 1,
           }}
         >
-          Continue to fields
+          {mapStep === 'farm' ? 'Next: add fields' : 'Save & continue'}
         </button>
       )}
     </div>

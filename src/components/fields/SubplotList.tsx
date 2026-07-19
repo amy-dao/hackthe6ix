@@ -31,9 +31,9 @@ export default function SubplotList({
           textAlign: 'center',
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>No subplots yet</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: palette.dark }}>No fields yet</div>
         <div style={{ fontSize: 13, color: palette.muted, lineHeight: 1.45, maxWidth: 280 }}>
-          Divide your main farm into smaller plots on the map to see them listed here.
+          Divide your farm into smaller fields on the map to see them listed here.
         </div>
         {onDrawSubplots && (
           <button
@@ -52,7 +52,7 @@ export default function SubplotList({
               fontFamily: 'inherit',
             }}
           >
-            Draw subplots
+            Draw fields
           </button>
         )}
       </div>

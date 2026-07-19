@@ -7,6 +7,8 @@ import { polygonCenter, toLatLng } from '../../lib/geo';
 interface MainFieldMapProps {
   farm: FarmState;
   height?: number | string;
+  selectedFieldId?: string | null;
+  onSelectField?: (id: string) => void;
 }
 
 function FitFarm({ coords, subplots }: { coords: LngLat[]; subplots: Subplot[] }) {
@@ -22,7 +24,7 @@ function FitFarm({ coords, subplots }: { coords: LngLat[]; subplots: Subplot[] }
   return null;
 }
 
-export default function MainFieldMap({ farm, height = '100%' }: MainFieldMapProps) {
+export default function MainFieldMap({ farm, height = '100%', selectedFieldId = null, onSelectField }: MainFieldMapProps) {
   const center = useMemo(() => {
     if (farm.farmPolygon?.length) return polygonCenter(farm.farmPolygon);
     return [41.5868, -93.625] as [number, number];
@@ -77,10 +79,11 @@ export default function MainFieldMap({ farm, height = '100%' }: MainFieldMapProp
             positions={toLatLng(sp.coordinates)}
             pathOptions={{
               color: sp.color,
-              weight: 2,
+              weight: sp.id === selectedFieldId ? 4 : 2,
               fillColor: sp.color,
-              fillOpacity: 0.4,
+              fillOpacity: sp.id === selectedFieldId ? 0.6 : 0.4,
             }}
+            eventHandlers={onSelectField ? { click: () => onSelectField(sp.id) } : undefined}
           />
         ))}
       </MapContainer>

@@ -1,4 +1,4 @@
-import type { CropEntryForm, Field } from '../types';
+import type { CropEntryForm, Field, FarmState } from '../types';
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ?? `http://${window.location.hostname}:8000`;
@@ -11,6 +11,16 @@ export function setAuthToken(token: string | null): void {
   authToken = token;
 }
 
+let onUnauthorized: (() => void) | null = null;
+
+/** Registered once by App on mount. Fires whenever an authenticated request
+ * comes back 401 (the session token no longer matches — e.g. another login
+ * on the same account issued a fresh one) so the app can silently
+ * re-authenticate instead of getting stuck with a dead token. */
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
@@ -20,6 +30,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (!res.ok) {
+    if (res.status === 401 && path !== '/login' && path !== '/signup') {
+      onUnauthorized?.();
+    }
     const body = await res.text().catch(() => '');
     const detail = (() => {
       try {
@@ -91,6 +104,18 @@ export function deleteField(id: string): Promise<void> {
   return request<void>(`/fields/${id}`, { method: 'DELETE' });
 }
 
+/** Cloud mirror of the whole farm-map drawing (boundary + subplot outlines +
+ * their form data) — lets a farmer pick up on a new device without redrawing.
+ * Returns null when nothing has been synced for this account yet. */
+export function fetchFarmState(): Promise<FarmState | null> {
+  return request<FarmState | null>('/farm');
+}
+
+/** Autosave call — fire this (debounced) whenever `farm` changes. */
+export function saveFarmState(farm: FarmState): Promise<FarmState> {
+  return request<FarmState>('/farm', { method: 'PUT', body: JSON.stringify(farm) });
+}
+
 export type ActionTier = 'monitor' | 'spot_treat' | 'broader_concern';
 
 export interface IdentifyResult {
@@ -109,6 +134,9 @@ export interface User {
   id: string;
   username: string;
   token: string;
+  farmerName?: string | null;
+  farmName?: string | null;
+  location?: string | null;
 }
 
 export function signup(username: string, password: string): Promise<User> {
@@ -119,7 +147,13 @@ export function login(username: string, password: string): Promise<User> {
   return request<User>('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
 }
 
-export function updateAccount(updates: { username?: string; password?: string }): Promise<User> {
+export function updateAccount(updates: {
+  username?: string;
+  password?: string;
+  farmerName?: string;
+  farmName?: string;
+  location?: string;
+}): Promise<User> {
   return request<User>('/account', { method: 'PATCH', body: JSON.stringify(updates) });
 }
 

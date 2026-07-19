@@ -1,5 +1,12 @@
-import type { FieldStatus } from '../types';
+import type { FieldStatus, Subplot } from '../types';
 import { statusLabels, type Palette } from '../palette';
+
+export function currentCropLabel(subplot: Subplot): string {
+  const current = subplot.data.cropEntries.find((e) => e.isCurrent && e.crop.trim());
+  if (current) return current.crop.trim();
+  const any = subplot.data.cropEntries.find((e) => e.crop.trim());
+  return any?.crop.trim() || 'No crop set';
+}
 
 export function statusMeta(status: FieldStatus, palette: Palette) {
   const colors = {

@@ -144,7 +144,7 @@ export default function SubplotDetailPanel({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: palette.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Edit subplot
+            Edit field
           </div>
           <div
             style={{
@@ -159,7 +159,7 @@ export default function SubplotDetailPanel({
           >
             <span style={{ width: 12, height: 12, borderRadius: 3, background: subplot.color, flexShrink: 0 }} />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {data.name || 'Subplot'}
+              {data.name || 'Field'}
             </span>
           </div>
         </div>

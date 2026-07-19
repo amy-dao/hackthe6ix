@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Palette } from '../../palette';
 
-export type FieldsViewMode = 'main' | 'subplots';
+export type FieldsViewMode = 'main' | 'fields';
 
 interface ViewToggleProps {
   palette: Palette;
@@ -11,8 +11,8 @@ interface ViewToggleProps {
 
 export default function ViewToggle({ palette, value, onChange }: ViewToggleProps) {
   const options: { id: FieldsViewMode; label: string }[] = [
-    { id: 'main', label: 'Main Field' },
-    { id: 'subplots', label: 'Subplots' },
+    { id: 'main', label: 'Farm' },
+    { id: 'fields', label: 'Fields' },
   ];
 
   const shell: CSSProperties = {

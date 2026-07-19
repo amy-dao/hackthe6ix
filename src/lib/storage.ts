@@ -11,7 +11,7 @@ export const EMPTY_FARM: FarmState = {
 function isValidSession(value: unknown): value is PersistedSession {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
-  if (typeof v.userName !== 'string' || typeof v.token !== 'string' || typeof v.introSeen !== 'boolean') return false;
+  if (typeof v.userName !== 'string' || typeof v.token !== 'string') return false;
   const farm = v.farm as Record<string, unknown> | undefined;
   return (
     !!farm &&
@@ -41,10 +41,3 @@ export function saveSession(session: PersistedSession): void {
   }
 }
 
-export function clearSession(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore
-  }
-}

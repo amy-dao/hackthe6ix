@@ -1,6 +1,7 @@
 import re
 import secrets
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import bcrypt
 from bson import ObjectId
@@ -11,7 +12,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from .crop_reference import CROP_REFERENCE, SOIL_TYPES
-from .db import fields_collection, users_collection
+from .db import farm_state_collection, fields_collection, users_collection
 from .gemini import identify_plant, recommend_rotations
 from .logic import derive_planting_status, empty_field_set, format_month_label, planted_field_set
 from .model_service import (
@@ -22,6 +23,7 @@ from .model_service import (
 )
 from .models import (
     AddFieldRequest,
+    FarmStatePayload,
     FieldOut,
     IdentifyRequest,
     IdentifyResult,
@@ -181,6 +183,31 @@ def get_reference():
     return ReferenceOut(soilTypes=SOIL_TYPES, crops=sorted(CROP_REFERENCE.keys()))
 
 
+@app.get("/farm", response_model=Optional[FarmStatePayload])
+def get_farm_state(current_user: dict = Depends(get_current_user)):
+    """The saved farm-map drawing for this account, or None if nothing has
+    been synced yet (brand-new account / first draw not saved)."""
+    doc = farm_state_collection.find_one({"ownerId": str(current_user["_id"])})
+    if not doc:
+        return None
+    return FarmStatePayload(**{k: doc.get(k) for k in ("farmPolygon", "farmAreaAcres", "subplots")})
+
+
+@app.put("/farm", response_model=FarmStatePayload)
+def set_farm_state(payload: FarmStatePayload, current_user: dict = Depends(get_current_user)):
+    """Autosave endpoint — the frontend debounces calls here on every change
+    to the farm boundary or subplot outlines, so a redraw is never needed
+    after switching devices/browsers."""
+    owner_id = str(current_user["_id"])
+    farm_state_collection.find_one_and_update(
+        {"ownerId": owner_id},
+        {"$set": {**payload.model_dump(), "ownerId": owner_id}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return payload
+
+
 @app.get("/fields", response_model=list[FieldOut])
 def list_fields(current_user: dict = Depends(get_current_user)):
     return [serialize_field(doc) for doc in fields_collection.find({"ownerId": str(current_user["_id"])})]
@@ -315,7 +342,14 @@ def identify(payload: IdentifyRequest):
 
 
 def serialize_user(doc: dict) -> dict:
-    return {"id": str(doc["_id"]), "username": doc["username"], "token": doc["sessionToken"]}
+    return {
+        "id": str(doc["_id"]),
+        "username": doc["username"],
+        "token": doc["sessionToken"],
+        "farmerName": doc.get("farmerName"),
+        "farmName": doc.get("farmName"),
+        "location": doc.get("location"),
+    }
 
 
 @app.post("/signup", response_model=UserOut, status_code=201)
@@ -350,6 +384,12 @@ def update_account(payload: UpdateAccountRequest, current_user: dict = Depends(g
         updates["username"] = payload.username.strip()
     if payload.password is not None:
         updates["passwordHash"] = bcrypt.hashpw(payload.password.encode("utf-8"), bcrypt.gensalt())
+    if payload.farmerName is not None:
+        updates["farmerName"] = payload.farmerName.strip()
+    if payload.farmName is not None:
+        updates["farmName"] = payload.farmName.strip()
+    if payload.location is not None:
+        updates["location"] = payload.location.strip()
     if not updates:
         return serialize_user(current_user)
     try:
