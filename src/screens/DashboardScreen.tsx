@@ -225,7 +225,7 @@ export default function DashboardScreen({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: palette.card, borderRadius: 14, padding: '12px 14px' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12.5, color: palette.muted }}>{selectedIds.length} selected</div>
-                <div style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>Empties the crop — doesn't delete the field</div>
+                <div style={{ fontSize: 11, color: palette.muted, marginTop: 1 }}>Deletes the selected field cards</div>
               </div>
               <div
                 onClick={onClearSelected}
@@ -241,7 +241,7 @@ export default function DashboardScreen({
                   whiteSpace: 'nowrap',
                 }}
               >
-                Clear crop
+                Delete field
               </div>
             </div>
           )}

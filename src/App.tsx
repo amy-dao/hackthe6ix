@@ -389,10 +389,10 @@ export default function App() {
     const ids = selectedIds;
     setSelectedIds([]);
     try {
-      const updates = await Promise.all(ids.map((id) => clearFieldCrop(id)));
-      setFields((fs) => fs.map((f) => updates.find((u) => u.id === f.id) ?? f));
+      await Promise.all(ids.map((id) => deleteFieldApi(id)));
+      setFields((fs) => fs.filter((f) => !ids.includes(f.id)));
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to clear selected fields.');
+      setActionMessage(err instanceof Error ? err.message : 'Failed to delete selected fields.');
     }
   }
 
