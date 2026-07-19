@@ -32,10 +32,20 @@ app = FastAPI(title="Field Intelligence API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    # Vite falls back to 3001/3002/... when 3000 is already taken.
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+        "http://127.0.0.1:5173",
+    ],
     # Also allow the dev servers when reached over LAN/Tailscale (teammates
-    # hitting your machine's IP instead of localhost) on the same two ports.
-    allow_origin_regex=r"http://(\d{1,3}\.){3}\d{1,3}:(3000|5173)",
+    # hitting your machine's IP instead of localhost) on common Vite ports.
+    allow_origin_regex=r"http://(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|5173)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
